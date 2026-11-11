@@ -1,6 +1,6 @@
 # The Dark Sparrow Eats
 
-A static site for recipes you type in yourself. No build step and no framework.
+A static site for recipes you type in yourself, hosted on Cloudflare (moved from GitHub Pages). No build step and no framework.
 
 ## Open the site
 
@@ -53,6 +53,47 @@ Save the file and refresh the browser.
 - `category` fills the category menu. `tags` are the small labels on each card.
 - Search checks the title, category, tags, ingredients, steps, and notes.
 
+## Hosting on Cloudflare
+
+The site is served by **Cloudflare Workers** (static assets only, no Worker code). These files control it:
+
+| File | What it does |
+|---|---|
+| `wrangler.jsonc` | Names the Cloudflare project (`dark-sparrow-eats`) and tells Cloudflare to publish this folder as-is. |
+| `.assetsignore` | Keeps `README.md`, `wrangler.jsonc`, `.gitignore` and other behind-the-scenes files off the public site. |
+| `_headers` | Adds security headers. It lists the only outside sites the page may use: Google Fonts and the Supabase reviews project. |
+| `_redirects` | Sends old `/recipes/...` links (from the GitHub Pages days) to the right page. |
+| `docs/` | A "we've moved" page for the old GitHub Pages address. Not published on Cloudflare. |
+
+### First-time setup (one time only)
+
+1. Create a free account at https://dash.cloudflare.com/sign-up.
+2. Go to **Workers & Pages** → **Create** → **Import a repository**, connect GitHub, and pick the **recipes** repository.
+3. Leave the build command **empty**. The deploy command is `npx wrangler deploy` (the default). Root directory: `/`.
+4. Click **Deploy**. In about a minute the site is live at `https://dark-sparrow-eats.<your-account>.workers.dev`.
+5. Open the site, check that recipes, fonts, and ratings all show, and post a test review.
+
+From then on, every change you push to GitHub is published automatically.
+
+**Using Cloudflare Pages instead?** That works too: choose **Pages** → **Connect to Git**, framework preset **None**, build command empty, build output directory `/`. Pages reads `_headers` and `_redirects` the same way. It ignores `wrangler.jsonc` and `.assetsignore`, so `README.md` and `docs/` will be publicly visible there. That does no harm.
+
+### Own domain (optional)
+
+In the Cloudflare project go to **Settings** → **Domains & Routes** → **Add** → **Custom domain** and enter the domain. If the domain is registered elsewhere, Cloudflare shows the DNS change to make there.
+
+### Retire the GitHub Pages copy
+
+Do this only after the Cloudflare site works. People with the old `thedarrksparro.github.io/recipes/` link get forwarded to the new address, including links to a single recipe.
+
+1. Open `docs/index.html` and `docs/404.html`. In each, replace `https://dark-sparrow-eats.YOUR-ACCOUNT.workers.dev` (it appears twice) with the real Cloudflare address. Commit.
+2. On GitHub, open the repository → **Settings** → **Pages**. Under **Branch**, keep `main` but change the folder from `/ (root)` to `/docs`, and click **Save**.
+
+Until you finish step 1, the page shows a "has moved" note and doesn't forward anyone.
+
+### Test locally the Cloudflare way (optional)
+
+The `python3 -m http.server` method above is still the easiest. To preview with Cloudflare's own headers and redirects, install Node.js and run `npx wrangler dev` in this folder, then open http://localhost:8787 .
+
 ## Home page
 
 The home page shows one tile per category with that category's top-rated recipe (highest average, then most reviews, then title). Categories with no ratings yet show their first recipe by title. Each tile has a **See all** button that opens the full list for that category. Typing in search or picking a category also shows the full matching list, and **Top picks** goes back.
@@ -68,7 +109,7 @@ Reviews are stored in a free Supabase project called **dark-sparrow-eats**:
 - Table `public.reviews` holds every review (`recipe_id`, `rating`, `name`, `comment`, `created_at`, `hidden`).
 - View `public.review_stats` gives the average rating and count per recipe, skipping hidden reviews.
 - Visitors post through the database function `public.submit_review`, which checks the review code before saving. They cannot write to the table directly.
-- `config.js` has the project URL and the public (publishable) key. That key is safe in the browser. Never put a secret or `service_role` key in this site.
+- `config.js` has the project URL and the public (publishable) key. The same URL is listed in `_headers`; if the Supabase project ever changes, update both. That key is safe in the browser. Never put a secret or `service_role` key in this site.
 - The `recipe_id` saved with a review is the recipe's `id` in `recipes.js`. If you change an `id`, its old reviews stop showing.
 
 Spam protection: visitors can only add reviews, never edit or delete them. The database rejects links in names and comments, and accepts at most 3 reviews per recipe and 10 site-wide per minute. The form also has a hidden honeypot field that bots tend to fill in.

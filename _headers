@@ -1,0 +1,16 @@
+# Response headers Cloudflare adds to every page and file.
+# Works on both Cloudflare Workers and Cloudflare Pages.
+#
+# Content-Security-Policy lists the only outside sites the page may use:
+#   - Google Fonts (fonts.googleapis.com, fonts.gstatic.com)
+#   - Supabase, for ratings and comments (klfiipyutunmlzawzicq.supabase.co)
+# If you ever move reviews to a different Supabase project, change that
+# address here AND in config.js, or ratings will stop loading.
+# Recipe photos may come from any https address, so img-src allows https:.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' https://klfiipyutunmlzawzicq.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-Frame-Options: DENY

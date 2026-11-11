@@ -1,0 +1,13 @@
+// Cloudflare deploy settings for The Dark Sparrow Eats.
+// This is a static site: no build step and no Worker script. Cloudflare
+// serves the files in this folder as they are. See README.md, "Hosting".
+{
+  "name": "dark-sparrow-eats",
+  "compatibility_date": "2026-11-04",
+  "assets": {
+    "directory": "./",
+    // The site uses #/ links, so every page is index.html. Any unknown
+    // address shows the home page instead of a blank error.
+    "not_found_handling": "single-page-application"
+  }
+}

@@ -1,0 +1,12 @@
+# Files Cloudflare should NOT publish on the website.
+# (Cloudflare Workers uploads everything in the folder unless it is listed here.)
+.git
+.gitignore
+.DS_Store
+.assetsignore
+wrangler.jsonc
+wrangler.toml
+README.md
+node_modules
+.wrangler
+docs

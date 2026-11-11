@@ -1,0 +1,6 @@
+# On GitHub Pages the site lived under /recipes/. On Cloudflare it lives at
+# the top of the address. Send any old /recipes/ link to the right place.
+# (The #/recipe/... part of a link is kept by the browser.)
+/recipes      /         301
+/recipes/     /         301
+/recipes/*    /:splat   301
