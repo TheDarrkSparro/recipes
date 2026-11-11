@@ -68,6 +68,9 @@ Recipes added this way are saved in the Supabase table `public.recipes`, not in 
 - **Hide or remove a saved recipe:** Supabase → **Table Editor** → **recipes**. Set **hidden** to `true` to take it off the site, or delete the row.
 - **Fix a typo in a saved recipe:** edit the row in the same table. Ingredients and steps are lists; each line is one item.
 - Photos: the form leaves the photo link empty on purpose, because pictures on other sites belong to their owners. Paste a link to your own photo (it must start with `https://`).
+Uploading a photo: on the Add a recipe form, click **Upload a photo** to take one with your phone or pick one from your computer. It's shrunk in the browser (longest side 1600 px, JPEG) and saved in the Supabase storage bucket `recipe-photos` when you click Save recipe. Uploading needs your owner code, just like saving.
+- One-time setup: in Supabase open SQL Editor, paste supabase/add-photo-uploads.sql, and click Run. Until then the form says photo uploads aren't switched on, and photo links still work.
+- Delete an uploaded photo: Supabase → Storage → recipe-photos → open the folder → pick the file → Delete. Then clear the recipe's image in Table Editor → recipes, or its card will simply show no photo.
 - Copied method steps are the original cook's words. Rewriting them in your own words is good practice; the source link is always credited as "Adapted from" on the recipe page.
 
 ## Hosting on Cloudflare

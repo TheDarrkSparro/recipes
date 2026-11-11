@@ -725,6 +725,18 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 .field textarea:focus,
 .link-row input:focus { outline: none; border-color: var(--saffron); box-shadow: var(--focus); }
 .field input[hidden] { display: none; }
+
+.photo-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem 1rem; }
+.photo-btn { cursor: pointer; }
+.photo-btn:focus-within { box-shadow: var(--focus); }
+.photo-preview {
+  width: 9rem;
+  height: 6rem;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border-bottom: 3px solid var(--saffron);
+}
+.photo-preview[hidden], .photo-remove[hidden] { display: none; }
 .field select { width: 100%; padding-top: 0.65rem; padding-bottom: 0.65rem; }
 
 .field-help { color: var(--muted); font-size: 0.86rem; }

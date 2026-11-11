@@ -155,8 +155,17 @@
       field("Method", '<textarea name="steps" rows="10"></textarea>', "wide",
         "Steps copied from another site are that cook’s own words. It’s good practice to rewrite them in yours; the source is credited on the recipe page either way.") +
       field("Cook’s notes", '<textarea name="notes" rows="3" maxlength="4000"></textarea>', "wide") +
-      field("Photo link", '<input name="image" type="url" placeholder="https://" maxlength="1000">', "wide",
-        "Optional. Use a link to your own photo; pictures on other sites belong to their owners.") +
+      '<div class="field field-wide photo-field">' +
+      '<span class="field-label">Photo</span>' +
+      '<div class="photo-pick">' +
+      '<label class="btn btn-quiet photo-btn"><input name="photoFile" type="file" accept="image/*" class="sr-only"> Upload a photo</label>' +
+      '<img class="photo-preview" alt="Photo preview" hidden>' +
+      '<button type="button" class="link-btn photo-remove" hidden>Remove photo</button>' +
+      "</div>" +
+      '<span class="field-help">Optional. Take one with your phone or pick one from your computer; it’s resized for the web when you save.</span>' +
+      "</div>" +
+      field("…or a photo link", '<input name="image" type="url" placeholder="https://" maxlength="1000">', "wide",
+        "Use a link to your own photo; pictures on other sites belong to their owners.") +
       field("Source", '<input name="source" type="url" placeholder="https://" maxlength="1000">', "wide",
         "Where the recipe came from. Shown as “Adapted from” on the recipe page.") +
       "</div>" +
@@ -180,6 +189,45 @@
     var saveMsg = root.querySelector("#save-msg");
     var catSelect = form.elements.category;
     var newCat = form.elements.newCategory;
+    var photoInput = form.elements.photoFile;
+    var photoPreview = form.querySelector(".photo-preview");
+    var photoRemove = form.querySelector(".photo-remove");
+    var photoBlob = null;
+
+    function clearPhoto() {
+      photoBlob = null;
+      photoInput.value = "";
+      photoPreview.hidden = true;
+      photoPreview.removeAttribute("src");
+      photoRemove.hidden = true;
+    }
+
+    photoInput.addEventListener("change", function () {
+      var file = photoInput.files && photoInput.files[0];
+      if (!file) return;
+      setMsg(saveMsg, "Preparing photo…", "");
+      shrinkPhoto(file)
+        .then(function (blob) {
+          photoBlob = blob;
+          return blobToDataUrl(blob);
+        })
+        .then(function (url) {
+          photoPreview.src = url;
+          photoPreview.hidden = false;
+          photoRemove.hidden = false;
+          form.elements.image.value = "";
+          setMsg(saveMsg, "", "");
+        })
+        .catch(function () {
+          clearPhoto();
+          setMsg(saveMsg, PHOTO_ERRORS.unreadable, "error");
+        });
+    });
+
+    photoRemove.addEventListener("click", function () {
+      clearPhoto();
+      photoInput.focus();
+    });
 
     function setMsg(el, text, kind) {
       el.textContent = text;
@@ -218,6 +266,7 @@
       form.elements.steps.value = (r.steps || []).join("\n");
       form.elements.notes.value = "";
       form.elements.image.value = "";
+      clearPhoto();
       form.elements.source.value = source || "";
       form.hidden = false;
     }
@@ -291,6 +340,7 @@
         el.ingredients.focus();
         return;
       }
+      if (photoBlob) image = "";
       if (image && !/^https:\/\//i.test(image)) {
         setMsg(saveMsg, "The photo link must start with https://.", "error");
         el.image.focus();
@@ -334,9 +384,17 @@
         return;
       }
       saveBtn.disabled = true;
-      saveBtn.textContent = "Saving…";
+      saveBtn.textContent = photoBlob ? "Uploading photo…" : "Saving…";
       setMsg(saveMsg, "", "");
-      window.Reviews.api("/rpc/add_recipe", { method: "POST", body: { p_code: code, p_recipe: recipe } })
+      var photoStep = photoBlob ? uploadPhoto(code, photoBlob) : Promise.resolve(null);
+      photoStep
+        .then(function (url) {
+          if (url) {
+            recipe.image = url;
+            saveBtn.textContent = "Saving…";
+          }
+          return window.Reviews.api("/rpc/add_recipe", { method: "POST", body: { p_code: code, p_recipe: recipe } });
+        })
         .then(function (data) {
           if (!data || data.ok !== true) {
             var err = new Error((data && data.error) || "invalid_input");
@@ -357,6 +415,10 @@
             el.code.value = "";
             el.code.focus();
           }
+          if (PHOTO_ERRORS[key]) {
+            setMsg(saveMsg, PHOTO_ERRORS[key], "error");
+            return;
+          }
           setMsg(saveMsg, SAVE_ERRORS[key] || "The recipe didn’t save. Check the details and try again.", "error");
         })
         .then(function () {
@@ -366,6 +428,92 @@
     });
 
     linkInput.focus();
+  }
+
+  /* ---------- Photo upload ----------
+     The photo is shrunk in the browser (longest side 1600 px, JPEG), then
+     saved to the Supabase storage bucket "recipe-photos". Uploading needs
+     the owner code: the database hands out a short-lived folder ticket only
+     for the right code (see supabase/add-photo-uploads.sql). */
+
+  var PHOTO_MAX = 1600;
+  var PHOTO_BUCKET = "recipe-photos";
+
+  var PHOTO_ERRORS = {
+    unreadable: "That file couldn’t be read as a photo. Try a JPEG or PNG.",
+    photo_upload: "The photo didn’t upload, so the recipe wasn’t saved. Try again, or use a photo link instead.",
+    photo_setup: "Photo uploads aren’t switched on yet (supabase/add-photo-uploads.sql hasn’t been run). Use a photo link for now."
+  };
+
+  function shrinkPhoto(file) {
+    if (!window.createImageBitmap || !/^image\//.test(file.type || "image/")) {
+      return Promise.reject(new Error("unreadable"));
+    }
+    return createImageBitmap(file).then(function (bmp) {
+      var scale = Math.min(1, PHOTO_MAX / Math.max(bmp.width, bmp.height));
+      var w = Math.max(1, Math.round(bmp.width * scale));
+      var h = Math.max(1, Math.round(bmp.height * scale));
+      var canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      var g = canvas.getContext("2d");
+      g.fillStyle = "#fff";
+      g.fillRect(0, 0, w, h);
+      g.drawImage(bmp, 0, 0, w, h);
+      if (bmp.close) bmp.close();
+      return new Promise(function (resolve, reject) {
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob);
+          else reject(new Error("unreadable"));
+        }, "image/jpeg", 0.82);
+      });
+    });
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(r.result); };
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+
+  function randomName() {
+    var a = new Uint8Array(8);
+    crypto.getRandomValues(a);
+    return Array.prototype.map.call(a, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+  }
+
+  function fail(kind) {
+    var err = new Error(kind);
+    err.kind = "server";
+    return err;
+  }
+
+  function uploadPhoto(code, blob) {
+    var cfg = window.REVIEWS_CONFIG || {};
+    var base = String(cfg.url || "").replace(/\/+$/, "");
+    return window.Reviews.api("/rpc/photo_upload_ticket", { method: "POST", body: { p_code: code } })
+      .catch(function (err) {
+        // A missing function means the SQL file hasn't been run yet.
+        if (err && (err.status === 404 || err.code === "PGRST202")) throw fail("photo_setup");
+        throw err;
+      })
+      .then(function (data) {
+        if (!data || data.ok !== true || !data.ticket) throw fail((data && data.error) || "photo_upload");
+        var path = data.ticket + "/" + randomName() + ".jpg";
+        return fetch(base + "/storage/v1/object/" + PHOTO_BUCKET + "/" + path, {
+          method: "POST",
+          headers: { apikey: cfg.key, "Content-Type": "image/jpeg", "x-upsert": "false" },
+          body: blob
+        })
+          .catch(function () { throw fail("photo_upload"); })
+          .then(function (res) {
+            if (!res.ok) throw fail(res.status === 404 ? "photo_setup" : "photo_upload");
+            return base + "/storage/v1/object/public/" + PHOTO_BUCKET + "/" + path;
+          });
+      });
   }
 
   function field(label, control, extra, help) {
