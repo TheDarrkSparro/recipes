@@ -15,7 +15,7 @@ Then visit http://localhost:8000 . Stop the server with Ctrl+C when you are done
 
 Use a local server rather than opening `index.html` as a file. Some browsers block scripts on `file://` pages.
 
-## Add a recipe
+## Add a recipe in recipes.js
 
 Edit `recipes.js`. Every recipe is one object inside `window.RECIPES`. The array starts empty, so the site shows an empty journal until you add one.
 
@@ -46,22 +46,41 @@ window.RECIPES = [
 ];
 ```
 
-Save the file and refresh the browser.
+Save the file, then open `index.html` and raise the number in `recipes.js?v=8` (to `v=9`, `v=10`, and so on). That makes browsers fetch the new list right away instead of showing an older copy. Do the same for any other file you change.
+
+The easier way is **Add a recipe** on the site itself (next section); it needs no file editing.
 
 - `image` is a URL, a relative path such as `images/soup.jpg`, or `""` if there is no photo.
 - Use `null` for `timeMinutes` or `servings` when you do not want them shown.
 - `category` fills the category menu. `tags` are the small labels on each card.
 - Search checks the title, category, tags, ingredients, steps, and notes.
 
+## Add a recipe from a link (on the site)
+
+Click **Add a recipe** at the top of any page. Paste a link to a recipe page and click **Get recipe**: the title, ingredients, method, time, and servings fill in for you to check. Click **Type a recipe in instead** for family recipes with no link. Enter your **owner code** and click **Save recipe**. It shows on the site right away for everyone.
+
+How it works: most recipe sites publish their recipe in a standard format (schema.org "Recipe") for Google. `worker/index.js` runs on Cloudflare at `/api/import`, reads that data from the page you link to, and hands it back to the form. Some sites block this; the form then keeps the link and you type the rest in.
+
+Recipes added this way are saved in the Supabase table `public.recipes`, not in `recipes.js`. Both kinds appear together on the site.
+
+- **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipes-table.sql`, change `CHANGE-THIS-CODE` near the bottom to your own owner code, and click **Run**.
+- **Change the owner code:** run the last statement in that file again with the new code.
+- **Hide or remove a saved recipe:** Supabase → **Table Editor** → **recipes**. Set **hidden** to `true` to take it off the site, or delete the row.
+- **Fix a typo in a saved recipe:** edit the row in the same table. Ingredients and steps are lists; each line is one item.
+- Photos: the form leaves the photo link empty on purpose, because pictures on other sites belong to their owners. Paste a link to your own photo (it must start with `https://`).
+- Copied method steps are the original cook's words. Rewriting them in your own words is good practice; the source link is always credited as "Adapted from" on the recipe page.
+
 ## Hosting on Cloudflare
 
-The site is served by **Cloudflare Workers** (static assets only, no Worker code). These files control it:
+The site is served by **Cloudflare Workers**: the files are served as they are, and one small Worker script handles `/api/import`. These files control it:
 
 | File | What it does |
 |---|---|
 | `wrangler.jsonc` | Names the Cloudflare project (`dark-sparrow-eats`) and tells Cloudflare to publish this folder as-is. |
 | `.assetsignore` | Keeps `README.md`, `wrangler.jsonc`, `.gitignore` and other behind-the-scenes files off the public site. |
 | `_headers` | Adds security headers. It lists the only outside sites the page may use: Google Fonts and the Supabase reviews project. |
+| `worker/` | The small Cloudflare Worker behind **Add a recipe** (reads recipe links). Not published as files. |
+| `supabase/` | The SQL that creates the saved-recipes table. Run it once in Supabase. Not published. |
 | `_redirects` | Sends old `/recipes/...` links (from the GitHub Pages days) to the right page. |
 | `docs/` | A "we've moved" page for the old GitHub Pages address. Not published on Cloudflare. |
 

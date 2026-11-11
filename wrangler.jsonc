@@ -1,13 +1,19 @@
 // Cloudflare deploy settings for The Dark Sparrow Eats.
-// This is a static site: no build step and no Worker script. Cloudflare
-// serves the files in this folder as they are. See README.md, "Hosting".
+// Cloudflare serves the files in this folder as they are. The small Worker in
+// worker/index.js only handles /api/import (reading a recipe from a link for
+// the "Add a recipe" page). See README.md, "Hosting".
 {
   "name": "dark-sparrow-eats",
+  "main": "worker/index.js",
   "compatibility_date": "2026-11-04",
   "assets": {
     "directory": "./",
+    "binding": "ASSETS",
     // The site uses #/ links, so every page is index.html. Any unknown
     // address shows the home page instead of a blank error.
-    "not_found_handling": "single-page-application"
-  }
+    "not_found_handling": "single-page-application",
+    // Only /api/... addresses run the Worker; everything else is a plain file.
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true }
 }

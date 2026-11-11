@@ -10,3 +10,5 @@ README.md
 node_modules
 .wrangler
 docs
+worker
+supabase

@@ -352,11 +352,21 @@
       list.setAttribute("data-comments", String(withText.length));
     }
 
-    request(
+    var reviewsPath =
       "/reviews?select=id,name,rating,comment,created_at&recipe_id=eq." +
-        encodeURIComponent(recipeId) +
-        "&order=created_at.desc&limit=200"
-    )
+      encodeURIComponent(recipeId) +
+      "&order=created_at.desc&limit=200";
+
+    /* Ask for visible reviews only. The database policy should already hide
+       them; this is a second guard. If visitors can't filter on the hidden
+       column, fall back to the plain query and let the policy do the work. */
+    request(reviewsPath + "&hidden=eq.false")
+      .catch(function (err) {
+        if (err && err.kind === "server" && err.status >= 400 && err.status < 500) {
+          return request(reviewsPath);
+        }
+        throw err;
+      })
       .then(function (rows) {
         if (!section.isConnected) return;
         reviews = Array.isArray(rows) ? rows : [];
@@ -458,6 +468,9 @@
     enabled: enabled,
     paintCards: paintCards,
     getStats: getStats,
-    mountDetail: mountDetail
+    mountDetail: mountDetail,
+    /* Shared with app.js and add-recipe.js for saved recipes. */
+    api: request,
+    friendlyError: friendlyError
   };
 })();

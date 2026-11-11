@@ -3,40 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7efe1">
+  <meta name="theme-color" content="#1d2327">
+  <meta name="description" content="Home recipes from The Dark Sparrow: sourdough, smoker barbecue, Herbes de Provence, and comfort food, written to cook from.">
   <title>The Dark Sparrow Eats</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,650;1,9..144,500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
-  <div class="page">
-    <header class="mast">
+  <a class="skip" href="#app">Skip to recipes</a>
+  <header class="topbar">
+    <div class="topbar-inner">
       <a class="brand" href="#/">
-        <svg class="monogram" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-          <circle cx="24" cy="24" r="23" fill="none" stroke="currentColor" stroke-width="1.25"></circle>
-          <path fill="currentColor" d="M10 29.5c2.2-5.6 7-9.3 13.2-9.6 1.4-3.4 4.4-5.4 7.8-5.1 1.6.1 2.9.8 3.8 1.8l4.2.6-3.4 2.1c.3 3.7-1.4 7-4.6 9.1l7.5 6.1-9.6-2.5c-2.6 1.4-5.7 1.9-8.9 1.4-3.4-.5-6.5-2-8.9-3.9h-1.1z"></path><circle cx="32.2" cy="17.6" r="1" fill="var(--cream)"></circle>
+        <svg class="mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M10 29.5c2.2-5.6 7-9.3 13.2-9.6 1.4-3.4 4.4-5.4 7.8-5.1 1.6.1 2.9.8 3.8 1.8l4.2.6-3.4 2.1c.3 3.7-1.4 7-4.6 9.1l7.5 6.1-9.6-2.5c-2.6 1.4-5.7 1.9-8.9 1.4-3.4-.5-6.5-2-8.9-3.9h-1.1z"></path>
+          <circle cx="32.2" cy="17.6" r="1.1" fill="var(--paper)"></circle>
         </svg>
-        <span class="brand-text">
-          <span class="eyebrow">Recipes &amp; kitchen notes</span>
-          <h1>The Dark Sparrow <em>Eats</em></h1>
-        </span>
+        <span class="brand-name">The Dark Sparrow Eats</span>
       </a>
-      <p class="subtitle">What you cook, kept simply.</p>
-      <hr class="rule">
-    </header>
-    <main id="app">
-      <noscript>
-        <p class="noscript">JavaScript is required to read recipes.js. Enable it, then reload.</p>
-      </noscript>
-    </main>
-    <footer class="colophon">The Dark Sparrow Eats · Personal recipes.</footer>
-  </div>
-  <script src="recipes.js"></script>
-  <script src="config.js"></script>
-  <script src="reviews.js?v=6"></script>
-  <script src="app.js?v=6"></script>
+      <nav class="topnav" aria-label="Main">
+        <a class="nav-link" href="#/" data-nav="list">Recipes</a>
+        <a class="btn btn-small" href="#/add" data-nav="add">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+          <span class="add-long">Add a recipe</span><span class="add-short" aria-hidden="true">Add</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+  <main id="app" class="page" tabindex="-1">
+    <noscript>
+      <p class="notice">This recipe box needs JavaScript to open. Turn it on, then reload the page.</p>
+    </noscript>
+  </main>
+  <footer class="footer">
+    <div class="footer-inner">
+      <p>The Dark Sparrow Eats. Home cooking, written down to cook from.</p>
+    </div>
+  </footer>
+  <script src="recipes.js?v=8"></script>
+  <script src="config.js?v=8"></script>
+  <script src="reviews.js?v=8"></script>
+  <script src="add-recipe.js?v=8"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
