@@ -125,7 +125,7 @@
       '<section class="add">' +
       '<a class="back" href="#/"><svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.5 5L6.5 10l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>All recipes</a>' +
       '<h1 class="add-title">Add a recipe</h1>' +
-      '<p class="add-sub">Paste a link to a recipe page and the details fill in for you to check. Or type a family recipe in by hand.</p>' +
+      '<p class="add-sub">Paste a link to a recipe page and the details fill in for you to check. Or type a family recipe in by hand. You can add a photo on the next step.</p>' +
 
       '<form class="link-form" id="link-form" novalidate>' +
       '<label class="field-label" for="link">Recipe link</label>' +
@@ -141,6 +141,17 @@
       '<div class="form-head"><h2>Check the details</h2><p class="muted">Change anything you like before saving. One ingredient or step per line.</p></div>' +
       '<div class="grid-2">' +
       field("Title", '<input name="title" required maxlength="200">', "wide") +
+      '<div class="field field-wide photo-field">' +
+      '<span class="field-label">Photo</span>' +
+      '<div class="photo-pick">' +
+      '<label class="btn btn-quiet photo-btn"><input name="photoFile" type="file" accept="image/*" class="sr-only"> Upload a photo</label>' +
+      '<img class="photo-preview" alt="Photo preview" hidden>' +
+      '<button type="button" class="link-btn photo-remove" hidden>Remove photo</button>' +
+      "</div>" +
+      '<span class="field-help">Optional. Take one with your phone or pick one from your computer; it’s resized for the web when you save.</span>' +
+      "</div>" +
+      field("…or a photo link", '<input name="image" type="url" placeholder="https://" maxlength="1000">', "wide",
+        "Use a link to your own photo; pictures on other sites belong to their owners.") +
       field("Category",
         '<select name="category">' +
         '<option value="">Choose a category</option>' +
@@ -155,17 +166,6 @@
       field("Method", '<textarea name="steps" rows="10"></textarea>', "wide",
         "Steps copied from another site are that cook’s own words. It’s good practice to rewrite them in yours; the source is credited on the recipe page either way.") +
       field("Cook’s notes", '<textarea name="notes" rows="3" maxlength="4000"></textarea>', "wide") +
-      '<div class="field field-wide photo-field">' +
-      '<span class="field-label">Photo</span>' +
-      '<div class="photo-pick">' +
-      '<label class="btn btn-quiet photo-btn"><input name="photoFile" type="file" accept="image/*" class="sr-only"> Upload a photo</label>' +
-      '<img class="photo-preview" alt="Photo preview" hidden>' +
-      '<button type="button" class="link-btn photo-remove" hidden>Remove photo</button>' +
-      "</div>" +
-      '<span class="field-help">Optional. Take one with your phone or pick one from your computer; it’s resized for the web when you save.</span>' +
-      "</div>" +
-      field("…or a photo link", '<input name="image" type="url" placeholder="https://" maxlength="1000">', "wide",
-        "Use a link to your own photo; pictures on other sites belong to their owners.") +
       field("Source", '<input name="source" type="url" placeholder="https://" maxlength="1000">', "wide",
         "Where the recipe came from. Shown as “Adapted from” on the recipe page.") +
       "</div>" +
