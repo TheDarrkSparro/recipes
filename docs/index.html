@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>The Dark Sparrow Eats has moved</title>
+  <!--
+    GitHub Pages forwarding page. NOT part of the Cloudflare site.
+    1. Change NEW_SITE below to the Cloudflare address (no slash at the end).
+    2. Change the same address in the <a href> further down.
+    3. In GitHub: Settings → Pages → Branch: main, folder: /docs → Save.
+    Old links, including links to one recipe (#/recipe/...), then forward to the new site.
+  -->
+  <script>
+    var NEW_SITE = "https://dark-sparrow-eats.YOUR-ACCOUNT.workers.dev";
+    if (NEW_SITE.indexOf("YOUR-ACCOUNT") === -1) {
+      location.replace(NEW_SITE + "/" + (location.hash || ""));
+    }
+  </script>
+  <style>
+    body { font-family: Georgia, serif; background: #f7efe1; color: #221b15; margin: 0; padding: 4rem 1.5rem; text-align: center; }
+    h1 { font-weight: 500; font-size: 2.2rem; margin: 0 0 1rem; }
+    a { color: #c2461f; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>The Dark Sparrow Eats has moved</h1>
+  <p>The recipes now live at <a href="https://dark-sparrow-eats.YOUR-ACCOUNT.workers.dev/">the new site</a>. Please update your bookmark.</p>
+</body>
+</html>
