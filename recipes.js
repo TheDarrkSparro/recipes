@@ -33,7 +33,7 @@ window.RECIPES = [
     ],
     "timeMinutes": null,
     "servings": null,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1598373182308-3270495d2f58?auto=format&fit=crop&w=1200&q=75",
     "ingredients": [
       "3½ to 4 cups (420 to 480 g) all-purpose flour or bread flour",
       "1 cup (240 ml) whole milk, warm",
@@ -65,7 +65,7 @@ window.RECIPES = [
     ],
     "timeMinutes": null,
     "servings": null,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1621378580334-79a6845bb3e7?auto=format&fit=crop&w=1200&q=75",
     "ingredients": [
       "1 lb cucumbers",
       "1 cup white vinegar",
@@ -88,7 +88,7 @@ window.RECIPES = [
     ],
     "timeMinutes": null,
     "servings": "6-8",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1658308766948-01c85ade2737?auto=format&fit=crop&w=1200&q=75",
     "ingredients": [
       "1 lb ground beef (80/20 or 85/15)",
       "1 medium onion, diced",
@@ -127,7 +127,7 @@ window.RECIPES = [
     ],
     "timeMinutes": null,
     "servings": "2-3",
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1595044643502-616eeebbdff3?auto=format&fit=crop&w=1200&q=75",
     "ingredients": [
       "4 slices of thick bread (brioche, challah, Texas toast, or regular sandwich bread)",
       "2 large eggs",
@@ -158,7 +158,7 @@ window.RECIPES = [
     ],
     "timeMinutes": null,
     "servings": null,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1569762404472-026308ba6b64?auto=format&fit=crop&w=1200&q=75",
     "ingredients": [
       "1 cup (240 g) sourdough discard (unfed is fine)",
       "3 very ripe bananas, mashed",
@@ -194,7 +194,7 @@ window.RECIPES = [
     ],
     "timeMinutes": null,
     "servings": null,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1587339144367-f1cacbecac82?auto=format&fit=crop&w=1200&q=75",
     "ingredients": [
       "480 g sourdough discard (100% hydration)",
       "480 g milk",
@@ -218,7 +218,7 @@ window.RECIPES = [
   {
     "timeMinutes": null,
     "servings": null,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1566792720002-d52fdf3d050a?auto=format&fit=crop&w=1200&q=75",
     "id": "homemade-herbes-de-provence",
     "title": "Homemade Herbes de Provence",
     "category": "Spice Blends",
@@ -245,7 +245,7 @@ window.RECIPES = [
   {
     "timeMinutes": null,
     "servings": null,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1633959639799-6d3f66e05710?auto=format&fit=crop&w=1200&q=75",
     "id": "herbes-de-provence-roasted-potatoes",
     "title": "Herbes de Provence Roasted Potatoes",
     "category": "Sides",
@@ -268,7 +268,7 @@ window.RECIPES = [
   {
     "timeMinutes": null,
     "servings": null,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1777891258069-454e66f8bedc?auto=format&fit=crop&w=1200&q=75",
     "id": "herbes-de-provence-grilled-chicken",
     "title": "Herbes de Provence Grilled Chicken",
     "category": "Mains",
@@ -293,7 +293,7 @@ window.RECIPES = [
   {
     "timeMinutes": null,
     "servings": null,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1490026220125-b42f3d66abd6?auto=format&fit=crop&w=1200&q=75",
     "id": "herbes-de-provence-bbq-rub",
     "title": "Herbes de Provence BBQ Rub",
     "category": "Spice Blends",
@@ -324,7 +324,7 @@ window.RECIPES = [
     ],
     "timeMinutes": null,
     "servings": 4,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1771250248306-3da13dac0a50?auto=format&fit=crop&w=1200&q=75",
     "ingredients": [
       "2½ dl (about 1 cup) all-purpose flour",
       "½ tsp salt",
@@ -354,7 +354,7 @@ window.RECIPES = [
     ],
     "timeMinutes": 250,
     "servings": 6,
-    "image": "",
+    "image": "https://images.unsplash.com/photo-1616501268826-ee9731c915d4?auto=format&fit=crop&w=1200&q=75",
     "ingredients": [
       "6 large potatoes, peeled and diced",
       "1 large onion, diced",
