@@ -411,6 +411,7 @@
     document.title = "The Dark Sparrow Eats";
     app.innerHTML =
       '<section class="intro">' +
+      '<div class="intro-text">' +
       '<h1 class="intro-title">Recipes from the Dark Sparrow kitchen</h1>' +
       '<p class="intro-sub">Sourdough, the smoker, a jar of Herbes de Provence, and the comfort food in between. What you cook, kept simply.</p>' +
       '<form class="search" role="search" id="search-form">' +
@@ -418,6 +419,11 @@
       '<svg class="search-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="8.5" cy="8.5" r="5.75" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>' +
       '<input id="search" type="search" placeholder="Search recipes or ingredients" autocomplete="off" value="' + esc(state.query) + '">' +
       "</form>" +
+      "</div>" +
+      '<figure class="intro-photo">' +
+      '<img src="https://images.unsplash.com/photo-1469014221409-dea4fc6a6b2e?auto=format&fit=crop&w=900&q=75" width="900" height="600" alt="A crusty loaf of bread on a wooden board with a bread knife" loading="eager" decoding="async">' +
+      '<figcaption>Photo: <a href="https://unsplash.com/photos/VWQM9MbZDDw" target="_blank" rel="noopener">Arturro on Unsplash</a></figcaption>' +
+      "</figure>" +
       "</section>" +
       '<nav class="tabs" id="tabs" aria-label="Categories">' + tabsHtml() + "</nav>" +
       '<div class="toolbar">' +

@@ -202,7 +202,32 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 
 /* ---------- Home ---------- */
 
-.intro { max-width: 44rem; margin-bottom: 2rem; }
+.intro {
+  display: grid;
+  grid-template-columns: minmax(0, 44rem) minmax(0, 1fr);
+  gap: 2.5rem;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.intro-photo { margin: 0; justify-self: end; width: 100%; max-width: 26rem; }
+.intro-photo img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border-bottom: 5px solid var(--saffron);
+  box-shadow: 0 10px 28px rgba(110, 13, 17, 0.18);
+  background: var(--saffron-wash);
+}
+.intro-photo figcaption { margin-top: 0.4rem; font-size: 0.75rem; color: var(--muted); text-align: right; }
+.intro-photo figcaption a { color: inherit; }
+
+@media (max-width: 860px) {
+  .intro { grid-template-columns: 1fr; gap: 1.25rem; }
+  .intro-photo { display: none; }
+}
 
 .intro-title { font-size: clamp(2rem, 4.5vw, 2.9rem); font-weight: 700; }
 
