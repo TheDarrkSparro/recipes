@@ -1,6 +1,8 @@
 /*
  * "Add a recipe" page. Paste a link and the site reads the recipe from that
- * page (through /api/import on Cloudflare), or type one in. Saving needs the
+ * page (through /api/import on Cloudflare), read one from a photo of a recipe
+ * card or cookbook page (through /api/read-photo, owner code only), or type
+ * one in. Saving needs the
  * owner code, which is checked by the database (see supabase/add-recipes-table.sql).
  */
 (function () {
@@ -125,7 +127,7 @@
       '<section class="add">' +
       '<a class="back" href="#/"><svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.5 5L6.5 10l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>All recipes</a>' +
       '<h1 class="add-title">Add a recipe</h1>' +
-      '<p class="add-sub">Paste a link to a recipe page and the details fill in for you to check. Or type a family recipe in by hand. You can add a photo on the next step.</p>' +
+      '<p class="add-sub">Paste a link to a recipe page, or take a photo of a recipe card or cookbook page, and the details fill in for you to check. Or type a family recipe in by hand. You can add a photo of the dish on the next step.</p>' +
 
       '<form class="link-form" id="link-form" novalidate>' +
       '<label class="field-label" for="link">Recipe link</label>' +
@@ -135,6 +137,24 @@
       "</div>" +
       '<p class="form-msg" id="link-msg" role="status" aria-live="polite"></p>' +
       '<button type="button" class="link-btn" id="manual">Type a recipe in instead</button>' +
+      "</form>" +
+
+      '<p class="add-or" aria-hidden="true"><span>or</span></p>' +
+
+      '<form class="link-form read-form" id="read-form" novalidate>' +
+      '<span class="field-label">Recipe card or cookbook page</span>' +
+      '<span class="field-help">Take a photo, or pick one you already have. Up to ' + READ_MAX_PHOTOS +
+      ' photos for one recipe, such as the front and back of a card. Lay it flat in good light so every word is sharp.</span>' +
+      '<div class="photo-pick">' +
+      '<label class="btn btn-quiet photo-btn"><input id="read-file" type="file" accept="image/*" multiple class="sr-only"> Choose photos</label>' +
+      '<ul class="read-thumbs" id="read-thumbs" aria-label="Chosen photos" hidden></ul>' +
+      "</div>" +
+      '<div class="read-row">' +
+      '<label class="field read-code"><span class="field-label">Owner code</span>' +
+      '<input id="read-code" type="password" autocomplete="off" maxlength="100" value="' + esc(savedCode) + '"></label>' +
+      '<button class="btn" type="submit" id="read-btn">Read recipe</button>' +
+      "</div>" +
+      '<p class="form-msg" id="read-msg" role="status" aria-live="polite"></p>' +
       "</form>" +
 
       '<form class="recipe-form" id="recipe-form" novalidate hidden>' +
@@ -264,7 +284,7 @@
       form.elements.servings.value = r.servings || "";
       form.elements.ingredients.value = (r.ingredients || []).join("\n");
       form.elements.steps.value = (r.steps || []).join("\n");
-      form.elements.notes.value = "";
+      form.elements.notes.value = r.notes || "";
       form.elements.image.value = "";
       clearPhoto();
       form.elements.source.value = source || "";
@@ -427,7 +447,157 @@
         });
     });
 
+    /* ---------- Read a recipe from a photo ---------- */
+
+    var readForm = root.querySelector("#read-form");
+    var readFile = root.querySelector("#read-file");
+    var readThumbs = root.querySelector("#read-thumbs");
+    var readCodeInput = root.querySelector("#read-code");
+    var readBtn = root.querySelector("#read-btn");
+    var readMsg = root.querySelector("#read-msg");
+    var readPhotos = []; // { blob, url }
+
+    function paintThumbs() {
+      readThumbs.innerHTML = readPhotos
+        .map(function (p, i) {
+          return (
+            '<li><img src="' + esc(p.url) + '" alt="Photo ' + (i + 1) + '">' +
+            '<button type="button" class="thumb-x" data-i="' + i + '" aria-label="Remove photo ' + (i + 1) + '">×</button></li>'
+          );
+        })
+        .join("");
+      readThumbs.hidden = !readPhotos.length;
+    }
+
+    readThumbs.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".thumb-x") : null;
+      if (!btn) return;
+      readPhotos.splice(Number(btn.getAttribute("data-i")), 1);
+      paintThumbs();
+      setMsg(readMsg, "", "");
+      readFile.focus();
+    });
+
+    readFile.addEventListener("change", function () {
+      var files = Array.prototype.slice.call(readFile.files || []);
+      readFile.value = "";
+      if (!files.length) return;
+      var room = READ_MAX_PHOTOS - readPhotos.length;
+      if (room <= 0) {
+        setMsg(readMsg, READ_ERRORS.too_many_photos, "error");
+        return;
+      }
+      var skipped = files.length > room;
+      files = files.slice(0, room);
+      setMsg(readMsg, "Preparing " + (files.length === 1 ? "photo" : "photos") + "…", "");
+      Promise.all(
+        files.map(function (f) {
+          return shrinkPhoto(f, READ_MAX_SIDE).then(function (blob) {
+            return blobToDataUrl(blob).then(function (url) {
+              return { blob: blob, url: url };
+            });
+          });
+        })
+      )
+        .then(function (list) {
+          readPhotos = readPhotos.concat(list);
+          paintThumbs();
+          setMsg(readMsg, skipped ? READ_ERRORS.too_many_photos : "", skipped ? "error" : "");
+        })
+        .catch(function () {
+          setMsg(readMsg, PHOTO_ERRORS.unreadable, "error");
+        });
+    });
+
+    readForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (readBtn.disabled) return;
+      var code = readCodeInput.value.trim();
+      if (!readPhotos.length) {
+        setMsg(readMsg, "Choose a photo of the recipe first.", "error");
+        readFile.focus();
+        return;
+      }
+      if (!code) {
+        setMsg(readMsg, "Enter your owner code. Only you can read photos.", "error");
+        readCodeInput.focus();
+        return;
+      }
+      readBtn.disabled = true;
+      readBtn.textContent = "Reading…";
+      setMsg(readMsg, "Reading your " + (readPhotos.length === 1 ? "photo" : "photos") + ". This can take up to a minute.", "");
+      readRecipePhotos(code, readPhotos.map(function (p) { return p.url; }), cats).then(function (data) {
+        readBtn.disabled = false;
+        readBtn.textContent = "Read recipe";
+        if (data && data.ok && data.recipe) {
+          var unclear = Array.isArray(data.unclear) ? data.unclear : [];
+          setMsg(
+            readMsg,
+            "Read “" + (data.recipe.title || "the recipe") + "”. Check every line against the card before saving; handwriting can be misread." +
+              (unclear.length ? " Not sure about: " + unclear.join("; ") + ". Those spots are marked [?]." : ""),
+            "ok"
+          );
+          showForm(data.recipe, "", false);
+          form.elements.code.value = code;
+          return;
+        }
+        var key = (data && data.error) || "network";
+        if (key === "wrong_code") {
+          storeCode("", false);
+          readCodeInput.value = "";
+          readCodeInput.focus();
+        }
+        setMsg(readMsg, READ_ERRORS[key] || SAVE_ERRORS[key] || READ_ERRORS.network, "error");
+      });
+    });
+
     linkInput.focus();
+  }
+
+  /* ---------- Reading a recipe from photos ----------
+     Photos are shrunk in the browser, then sent with the owner code to
+     /api/read-photo on Cloudflare (worker/read-photo.js), which checks the
+     code and asks Claude to read the recipe. Nothing is saved until you click
+     Save recipe. */
+
+  var READ_MAX_PHOTOS = 3;
+  var READ_MAX_SIDE = 1600;
+
+  var READ_ERRORS = {
+    not_set_up: "Reading photos isn’t switched on yet. See “Read a recipe from a photo” in README.md for the one-time setup.",
+    wrong_code: "That owner code isn’t right. Check it and try again.",
+    too_many_attempts: "Too many wrong codes were tried, so this is paused for 10 minutes.",
+    daily_limit: "That’s today’s limit of photo reads. Try again tomorrow, or type the recipe in.",
+    not_a_recipe: "That photo doesn’t look like a recipe, or the writing couldn’t be read. Try a closer, sharper photo in good light.",
+    too_many_photos: "Up to " + READ_MAX_PHOTOS + " photos per recipe. Remove one to add another.",
+    too_big: "Those photos are too large to send. Try fewer photos.",
+    no_photo: "Choose a photo of the recipe first.",
+    busy: "The photo reader is busy right now. Try again in a minute.",
+    no_credit: "The Claude account behind the photo reader is out of credit or over its spending limit. Check it at platform.claude.com, then try again.",
+    key_problem: "The photo reader’s Claude API key isn’t working. Check ANTHROPIC_API_KEY in the Cloudflare dashboard.",
+    model_problem: "The photo reader’s model name isn’t recognized. Check PHOTO_MODEL in wrangler.jsonc.",
+    check_failed: "Couldn’t check the owner code just now. Try again in a minute.",
+    reader_failed: "Couldn’t read the photo just now. Try again, or type the recipe in.",
+    network: "The photo reader isn’t available right now. Check your connection and try again, or type the recipe in."
+  };
+
+  function readRecipePhotos(code, images, categories) {
+    return fetch("/api/read-photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ code: code, images: images, categories: categories })
+    })
+      .catch(function () {
+        return null;
+      })
+      .then(function (res) {
+        if (!res) return { ok: false, error: "network" };
+        var type = res.headers.get("content-type") || "";
+        if (type.indexOf("application/json") === -1) return { ok: false, error: "network" };
+        return res.json().catch(function () {
+          return { ok: false, error: "network" };
+        });
+      });
   }
 
   /* ---------- Photo upload ----------
@@ -445,12 +615,13 @@
     photo_setup: "Photo uploads aren’t switched on yet (supabase/add-photo-uploads.sql hasn’t been run). Use a photo link for now."
   };
 
-  function shrinkPhoto(file) {
+  function shrinkPhoto(file, maxSide) {
+    var limit = maxSide || PHOTO_MAX;
     if (!window.createImageBitmap || !/^image\//.test(file.type || "image/")) {
       return Promise.reject(new Error("unreadable"));
     }
     return createImageBitmap(file).then(function (bmp) {
-      var scale = Math.min(1, PHOTO_MAX / Math.max(bmp.width, bmp.height));
+      var scale = Math.min(1, limit / Math.max(bmp.width, bmp.height));
       var w = Math.max(1, Math.round(bmp.width * scale));
       var h = Math.max(1, Math.round(bmp.height * scale));
       var canvas = document.createElement("canvas");

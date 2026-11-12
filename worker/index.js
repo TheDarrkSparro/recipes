@@ -1,11 +1,14 @@
 /*
  * Cloudflare Worker for The Dark Sparrow Eats.
- * Everything is served from the static files, except /api/import, which reads
- * a recipe web page and returns its recipe as JSON for the "Add a recipe" page.
+ * Everything is served from the static files, except:
+ *   /api/import      reads a recipe web page and returns its recipe as JSON
+ *   /api/read-photo  reads a recipe from photos (see read-photo.js)
+ * Both are for the "Add a recipe" page.
  * (A browser can't read other websites directly, so this does it instead.)
  * It only reads and returns recipe data; saving happens in Supabase.
  */
 import { parseRecipe, pageTitle } from "./parse-recipe.js";
+import { handleReadPhoto } from "./read-photo.js";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 
@@ -102,6 +105,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/import") return handleImport(request);
+    if (url.pathname === "/api/read-photo") return handleReadPhoto(request, env);
     if (url.pathname.startsWith("/api/")) return json({ ok: false, error: "not_found" }, 404);
     return env.ASSETS.fetch(request);
   }
