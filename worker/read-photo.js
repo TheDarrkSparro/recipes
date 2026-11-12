@@ -194,9 +194,8 @@ async function askClaude(env, images, categories) {
 
 export async function handleReadPhoto(request, env) {
   if (request.method !== "POST") return json({ ok: false, error: "method" }, 405);
-  if (!env.ANTHROPIC_API_KEY || !env.SUPABASE_URL || !env.SUPABASE_KEY) {
-    return json({ ok: false, error: "not_set_up" }, 503);
-  }
+  if (!env.ANTHROPIC_API_KEY) return json({ ok: false, error: "not_set_up", missing: "key" }, 503);
+  if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return json({ ok: false, error: "not_set_up", missing: "settings" }, 503);
   const size = Number(request.headers.get("content-length") || 0);
   if (size > MAX_BODY_BYTES) return json({ ok: false, error: "too_big" }, 413);
 
@@ -216,6 +215,7 @@ export async function handleReadPhoto(request, env) {
   const categories = list(body.categories, 30, 60);
 
   const check = await checkOwner(env, code);
+  if (check === "not_set_up") return json({ ok: false, error: "not_set_up", missing: "database" }, 503);
   if (check !== "ok") {
     const status = check === "wrong_code" ? 403 : check === "too_many_attempts" || check === "daily_limit" ? 429 : 503;
     return json({ ok: false, error: check }, status);

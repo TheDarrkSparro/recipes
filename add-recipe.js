@@ -547,7 +547,9 @@
           readCodeInput.value = "";
           readCodeInput.focus();
         }
-        setMsg(readMsg, READ_ERRORS[key] || SAVE_ERRORS[key] || READ_ERRORS.network, "error");
+        var text = READ_ERRORS[key] || SAVE_ERRORS[key] || READ_ERRORS.network;
+        if (key === "not_set_up" && data && READ_MISSING[data.missing]) text = READ_MISSING[data.missing];
+        setMsg(readMsg, text, "error");
       });
     });
 
@@ -579,6 +581,13 @@
     check_failed: "Couldn’t check the owner code just now. Try again in a minute.",
     reader_failed: "Couldn’t read the photo just now. Try again, or type the recipe in.",
     network: "The photo reader isn’t available right now. Check your connection and try again, or type the recipe in."
+  };
+
+  /* Which setup step is missing, so the message can say exactly what to fix. */
+  var READ_MISSING = {
+    key: "Reading photos isn’t switched on yet: Cloudflare can’t find the secret ANTHROPIC_API_KEY. In the Cloudflare dashboard open the recipes Worker → Settings → Variables and Secrets, and add it with the type Secret.",
+    settings: "Reading photos isn’t switched on yet: the Supabase settings in wrangler.jsonc didn’t reach Cloudflare. Push the latest version again.",
+    database: "Reading photos isn’t switched on yet: Supabase doesn’t have photo_read_ticket. Run supabase/add-photo-reading.sql in the Supabase SQL Editor."
   };
 
   function readRecipePhotos(code, images, categories) {
