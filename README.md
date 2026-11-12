@@ -73,6 +73,29 @@ Uploading a photo: on the Add a recipe form, click **Upload a photo** to take on
 - Delete an uploaded photo: Supabase → Storage → recipe-photos → open the folder → pick the file → Delete. Then clear the recipe's image in Table Editor → recipes, or its card will simply show no photo.
 - Copied method steps are the original cook's words. Rewriting them in your own words is good practice; the source link is always credited as "Adapted from" on the recipe page.
 
+## Read a recipe from a photo (on the site)
+
+On **Add a recipe**, under **Recipe card or cookbook page**, click **Choose photos**. On a phone you can take the picture right there. Up to 3 photos make one recipe, for example the front and back of a card. Enter your **owner code** and click **Read recipe**. After about 10–60 seconds the form fills in. **Check every line against the card**, because handwriting can be misread. Anything the reader wasn't sure of is marked `[?]` and listed above the form. Then click **Save recipe** as usual.
+
+Only someone with the owner code can use it. The code is checked before the photo is sent anywhere.
+
+How it works: `worker/read-photo.js` runs on Cloudflare at `/api/read-photo`. It checks the owner code with Supabase (`public.photo_read_ticket`), then sends the photo to the **Claude API**, which reads the recipe and hands the fields back to the form. The photo itself isn't kept. If you also want a picture of the finished dish, add it with **Upload a photo** in the form.
+
+Each read costs a little on your Claude API account: a few cents at most with the default model. To limit spending:
+
+- The site allows at most **50 photo reads a day**. Change the `50` in `supabase/add-photo-reading.sql` and run it again to change that.
+- Set a monthly spend limit for the account at https://platform.claude.com (Settings → Limits).
+- In `wrangler.jsonc`, change `PHOTO_MODEL` from `claude-sonnet-5-5` to `claude-haiku-5-5` for a cheaper reader. It's a bit less sure with messy handwriting.
+
+### One-time setup
+
+1. **Supabase:** open **SQL Editor**, paste `supabase/add-photo-reading.sql`, and click **Run**. Do this after `add-recipes-table.sql`, because it uses the same owner code.
+2. **Claude API key:** sign in at https://platform.claude.com, open **API Keys**, and create a key named `dark-sparrow-eats`. Copy it; it's shown only once.
+3. **Give the key to Cloudflare as a secret:** in the Cloudflare dashboard open **Workers & Pages** → **dark-sparrow-eats** → **Settings** → **Variables and Secrets** → **Add**. Choose type **Secret**, name it `ANTHROPIC_API_KEY`, paste the key, and deploy. Never put this key in any file in the repo; it's private, unlike the Supabase key.
+4. Push this version to GitHub so Cloudflare publishes it, then try a recipe card.
+
+Until steps 1–3 are done, the form says reading photos isn't switched on yet. Everything else keeps working.
+
 ## Hosting on Cloudflare
 
 The site is served by **Cloudflare Workers**: the files are served as they are, and one small Worker script handles `/api/import`. These files control it:
@@ -82,8 +105,8 @@ The site is served by **Cloudflare Workers**: the files are served as they are, 
 | `wrangler.jsonc` | Names the Cloudflare project (`dark-sparrow-eats`) and tells Cloudflare to publish this folder as-is. |
 | `.assetsignore` | Keeps `README.md`, `wrangler.jsonc`, `.gitignore` and other behind-the-scenes files off the public site. |
 | `_headers` | Adds security headers. It lists the only outside sites the page may use: Google Fonts and the Supabase reviews project. |
-| `worker/` | The small Cloudflare Worker behind **Add a recipe** (reads recipe links). Not published as files. |
-| `supabase/` | The SQL that creates the saved-recipes table. Run it once in Supabase. Not published. |
+| `worker/` | The small Cloudflare Worker behind **Add a recipe** (reads recipe links and recipe photos). Not published as files. |
+| `supabase/` | The SQL for saved recipes, photo uploads, and photo reading. Run each file once in Supabase. Not published. |
 | `_redirects` | Sends old `/recipes/...` links (from the GitHub Pages days) to the right page. |
 | `docs/` | A "we've moved" page for the old GitHub Pages address. Not published on Cloudflare. |
 

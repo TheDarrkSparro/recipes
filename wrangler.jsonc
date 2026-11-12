@@ -1,7 +1,8 @@
 // Cloudflare deploy settings for The Dark Sparrow Eats.
 // Cloudflare serves the files in this folder as they are. The small Worker in
-// worker/index.js only handles /api/import (reading a recipe from a link for
-// the "Add a recipe" page). See README.md, "Hosting".
+// worker/index.js only handles /api/import (reading a recipe from a link) and
+// /api/read-photo (reading a recipe from a photo) for the "Add a recipe" page.
+// See README.md, "Hosting" and "Read a recipe from a photo".
 {
   "name": "dark-sparrow-eats",
   "main": "worker/index.js",
@@ -14,6 +15,15 @@
     "not_found_handling": "single-page-application",
     // Only /api/... addresses run the Worker; everything else is a plain file.
     "run_worker_first": ["/api/*"]
+  },
+  // Settings for /api/read-photo. These are not secret (the Supabase key is
+  // the same public one as in config.js). The Claude API key IS secret: it is
+  // set in the Cloudflare dashboard as ANTHROPIC_API_KEY, never in this file.
+  // PHOTO_MODEL: use "claude-haiku-5-5" to spend less per photo.
+  "vars": {
+    "SUPABASE_URL": "https://klfiipyutunmlzawzicq.supabase.co",
+    "SUPABASE_KEY": "sb_publishable_CEnbNpq3u_L-1A8XS715Gg_hCqXlV5S",
+    "PHOTO_MODEL": "claude-sonnet-5-5"
   },
   "observability": { "enabled": true }
 }
