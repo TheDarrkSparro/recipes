@@ -125,7 +125,7 @@ The site is served by **Cloudflare Workers**: the files are served as they are, 
 1. Create a free account at https://dash.cloudflare.com/sign-up.
 2. Go to **Workers & Pages** → **Create** → **Import a repository**, connect GitHub, and pick the **recipes** repository.
 3. Leave the build command **empty**. The deploy command is `npx wrangler deploy` (the default). Root directory: `/`.
-4. Click **Deploy**. In about a minute the site is live at `https://dark-sparrow-eats.<your-account>.workers.dev`.
+4. Click **Deploy**. In about a minute the site is live. Ours is at `https://recipes.the-dark-sparro.workers.dev`.
 5. Open the site, check that recipes, fonts, and ratings all show, and post a test review.
 
 From then on, every change you push to GitHub is published automatically.
@@ -140,7 +140,7 @@ In the Cloudflare project go to **Settings** → **Domains & Routes** → **Add*
 
 Do this only after the Cloudflare site works. People with the old `thedarrksparro.github.io/recipes/` link get forwarded to the new address, including links to a single recipe.
 
-1. Open `docs/index.html` and `docs/404.html`. In each, replace `https://dark-sparrow-eats.YOUR-ACCOUNT.workers.dev` (it appears twice) with the real Cloudflare address. Commit.
+1. Open `docs/index.html` and `docs/404.html`. Both already point to `https://recipes.the-dark-sparro.workers.dev`; if the address ever changes, replace it there (it appears twice in each file) and commit.
 2. On GitHub, open the repository → **Settings** → **Pages**. Under **Branch**, keep `main` but change the folder from `/ (root)` to `/docs`, and click **Save**.
 
 Until you finish step 1, the page shows a "has moved" note and doesn't forward anyone.
