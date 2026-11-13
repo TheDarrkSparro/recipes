@@ -178,12 +178,74 @@
       });
   }
 
+  /* ---------- The category list (supabase/add-categories.sql) ----------
+     catList is the owner's list in order, each with the old names it used to
+     have. It stays null until that SQL has been run; then the categories
+     already used by recipes are offered instead, as before. */
+  var catList = null;
+  var allLoaded = false;
+
+  function loadCategories() {
+    return window.Reviews.api("/recipe_categories?select=name,sort_order,also_matches&order=sort_order")
+      .then(function (rows) {
+        var list = (Array.isArray(rows) ? rows : [])
+          .filter(function (r) {
+            return r && str(r.name);
+          })
+          .map(function (r) {
+            return { name: str(r.name), aliases: stringList(r.also_matches) };
+          });
+        catList = list.length ? list : null;
+      })
+      .catch(function () {
+        /* Not set up yet, or offline: keep what we had. */
+      });
+  }
+
+  /* The list's spelling of a category, following renames. */
+  function canonicalCategory(name) {
+    var n = str(name);
+    if (!n || !catList) return n;
+    var low = n.toLowerCase();
+    for (var i = 0; i < catList.length; i++) {
+      if (catList[i].name.toLowerCase() === low) return catList[i].name;
+    }
+    for (var j = 0; j < catList.length; j++) {
+      for (var k = 0; k < catList[j].aliases.length; k++) {
+        if (catList[j].aliases[k].toLowerCase() === low) return catList[j].name;
+      }
+    }
+    return n;
+  }
+
+  /* What the Category drop-down offers, in order. */
+  function categoryChoices() {
+    if (catList)
+      return catList.map(function (c) {
+        return c.name;
+      });
+    var seen = Object.create(null);
+    var out = [];
+    allRecipes.forEach(function (r) {
+      var c = str(r.category);
+      if (c && !seen[c]) {
+        seen[c] = true;
+        out.push(c);
+      }
+    });
+    return out.sort(function (a, b) {
+      return a.localeCompare(b);
+    });
+  }
+
   function loadSaved() {
+    allLoaded = false;
     if (!window.Reviews || !window.Reviews.enabled || !window.Reviews.api) {
       savedState = "failed";
+      allLoaded = true;
       return Promise.resolve();
     }
-    var extras = Promise.all([loadHiddenIds(), loadHiddenSaved()]);
+    var extras = Promise.all([loadHiddenIds(), loadHiddenSaved(), loadCategories()]);
     var rows = window.Reviews.api(
       "/recipes?select=id,title,category,tags,time_minutes,servings,image,ingredients,steps,notes,source_url,created_at&order=created_at.desc&limit=500"
     )
@@ -196,7 +258,10 @@
       .catch(function () {
         savedState = "failed";
       });
-    return Promise.all([rows, extras]).then(rebuild);
+    return Promise.all([rows, extras]).then(function () {
+      allLoaded = true;
+      rebuild();
+    });
   }
 
   /* ---------- Helpers ---------- */
@@ -310,10 +375,16 @@
       }
       counts[c] += 1;
     });
-    var LAST = { Other: 1, Hidden: 2 };
+    // The owner's order first, then any category not in the list, then
+    // Other and Hidden.
+    var rank = Object.create(null);
+    (catList || []).forEach(function (c, i) {
+      rank[c.name] = i + 1;
+    });
+    var LAST = { Other: 1001, Hidden: 1002 };
     list.sort(function (a, b) {
-      var la = LAST[a] || 0;
-      var lb = LAST[b] || 0;
+      var la = LAST[a] || rank[a] || 1000;
+      var lb = LAST[b] || rank[b] || 1000;
       if (la !== lb) return la - lb;
       return a.localeCompare(b);
     });
@@ -327,7 +398,7 @@
   var HIDDEN_CATEGORY = "Hidden";
   function categoryOf(recipe) {
     if (recipe._hidden) return HIDDEN_CATEGORY;
-    return str(recipe.category) || "Other";
+    return canonicalCategory(recipe.category) || "Other";
   }
 
   /* ---------- Ratings (from reviews.js) ---------- */
@@ -534,6 +605,8 @@
   function paintTabs() {
     var el = document.getElementById("tabs");
     if (el) el.innerHTML = tabsHtml();
+    var edit = document.getElementById("cat-edit");
+    if (edit) edit.innerHTML = ownerMode() ? '<a class="cat-edit-link" href="#/categories">Edit categories</a>' : "";
   }
 
   function renderList() {
@@ -554,6 +627,7 @@
       '<nav class="tabs" id="tabs" aria-label="Categories">' + tabsHtml() + "</nav>" +
       '<div class="toolbar">' +
       '<p class="count" id="count" aria-live="polite"></p>' +
+      '<span class="cat-edit" id="cat-edit"></span>' +
       '<label class="sort"><span>Sort</span><select id="sort">' +
       '<option value="top">Top rated</option>' +
       '<option value="az">A to Z</option>' +
@@ -596,6 +670,7 @@
       paintResults();
       search.focus();
     });
+    paintTabs();
     paintResults();
 
     if (!statsMap && window.Reviews && window.Reviews.getStats) {
@@ -970,15 +1045,15 @@
       app.innerHTML = emptyBlock("Adding recipes isn't available", "The add-recipe script didn't load. Refresh the page and try again.");
       return;
     }
+    // Wait for the category list, so the drop-down is the right one.
+    if (!allLoaded) {
+      app.innerHTML = '<p class="loading">Opening the form…</p>';
+      return;
+    }
     window.AddRecipe.mount(app, {
-      categories: categories()
-        .map(function (c) {
-          return c.name;
-        })
-        .filter(function (n) {
-          return n !== "Other" && n !== HIDDEN_CATEGORY;
-        }),
-      takenIds: recipes.map(recipeId),
+      categories: categoryChoices(),
+      canEditCategories: ownerMode(),
+      takenIds: allRecipes.map(recipeId),
       onSaved: function (recipe) {
         saved.unshift(recipe);
         rebuild();
@@ -1012,19 +1087,13 @@
     }
     if (needSignIn("#/edit/" + encodeURIComponent(id), "To edit “" + titleOf(recipe) + "”, sign in with the account you were invited to.")) return;
     document.title = "Edit " + titleOf(recipe) + " · The Dark Sparrow Eats";
-    var cats = categories()
-      .map(function (c) {
-        return c.name;
-      })
-      .filter(function (n) {
-        return n !== "Other" && n !== HIDDEN_CATEGORY;
-      });
     window.AddRecipe.mount(app, {
-      categories: cats,
+      categories: categoryChoices(),
+      canEditCategories: ownerMode(),
       edit: {
         id: recipeId(recipe),
         title: titleOf(recipe),
-        category: str(recipe.category),
+        category: canonicalCategory(recipe.category),
         tags: stringList(recipe.tags),
         timeMinutes: Number(recipe.timeMinutes) > 0 ? Number(recipe.timeMinutes) : "",
         servings: recipe.servings == null ? "" : String(recipe.servings),
@@ -1043,6 +1112,286 @@
         rebuild();
         location.hash = "#/recipe/" + encodeURIComponent(updated.id);
       }
+    });
+  }
+
+
+  /* ---------- Edit the category list (site owner only) ---------- */
+
+  var CATEGORY_ERRORS = {
+    not_signed_in: "Your sign-in has ended. Sign in again, then save.",
+    not_contributor: "This account can’t change categories.",
+    not_owner: "Only the site owner can change categories.",
+    invalid_name: "Each category needs a name of 60 characters or fewer.",
+    reserved_name: "“Hidden” and “Other” are used by the site itself. Pick another name.",
+    duplicate_name: "Two categories have the same name. Change or remove one.",
+    invalid_input: "That list couldn’t be saved. Keep at least one category, and no more than 40.",
+    not_set_up: "The category list isn’t switched on yet. In Supabase, run supabase/add-categories.sql (see README.md).",
+    network: "Couldn’t reach the recipe database. Check your connection and try again.",
+    failed: "That didn’t save. Refresh the page and try again."
+  };
+
+  /* How many recipes (hidden ones included) use each category. */
+  function categoryCounts() {
+    var counts = Object.create(null);
+    allRecipes.forEach(function (r) {
+      var c = canonicalCategory(r.category);
+      if (c) counts[c] = (counts[c] || 0) + 1;
+    });
+    return counts;
+  }
+
+  function renderCategories() {
+    document.title = "Edit categories · The Dark Sparrow Eats";
+    if (needSignIn("#/categories", "Sign in to edit the category list.")) return;
+    if (!allLoaded) {
+      app.innerHTML = '<p class="loading">Opening the category list…</p>';
+      return;
+    }
+    var back = '<a class="back" href="#/">' + backArrow() + "All recipes</a>";
+    if (!ownerMode()) {
+      app.innerHTML = back + emptyBlock("Only the site owner can edit categories", "Ask Art if a category is missing from the list.");
+      return;
+    }
+    if (!catList) {
+      app.innerHTML = back + emptyBlock("The category list isn’t switched on yet", "In Supabase, open SQL Editor, paste <code>supabase/add-categories.sql</code>, and click Run. Then refresh this page.");
+      return;
+    }
+
+    var counts = categoryCounts();
+    var rows = catList.map(function (c) {
+      return { name: c.name, was: c.name };
+    });
+
+    app.innerHTML =
+      back +
+      '<section class="cat-editor">' +
+      '<h1 class="add-title">Edit categories</h1>' +
+      '<p class="add-sub">These are the only categories offered when anyone adds or edits a recipe, in this order. Only you can see this page.</p>' +
+      '<ul class="cat-rows" id="cat-rows"></ul>' +
+      '<form class="cat-add" id="cat-add" novalidate>' +
+      '<label class="field-label" for="cat-new">Add a category</label>' +
+      '<div class="link-row"><input id="cat-new" maxlength="60" autocomplete="off" placeholder="e.g. Desserts">' +
+      '<button type="submit" class="btn btn-quiet">Add</button></div>' +
+      "</form>" +
+      '<div id="cat-loose"></div>' +
+      '<ul class="cat-help">' +
+      "<li><strong>Rename</strong> by typing over a name. Recipes in that category move with it.</li>" +
+      "<li><strong>Remove</strong> works once no recipe uses the category; move those recipes first.</li>" +
+      "<li>Nothing changes until you click <strong>Save categories</strong>.</li>" +
+      "</ul>" +
+      '<div class="form-foot">' +
+      '<button type="button" class="btn" id="cat-save">Save categories</button>' +
+      '<a class="link-btn" href="#/">Cancel</a>' +
+      '<p class="form-msg" id="cat-msg" role="status" aria-live="polite"></p>' +
+      "</div>" +
+      "</section>";
+
+    var list = document.getElementById("cat-rows");
+    var msg = document.getElementById("cat-msg");
+    var saveBtn = document.getElementById("cat-save");
+    var newInput = document.getElementById("cat-new");
+
+    function say(text, kind) {
+      msg.textContent = text || "";
+      msg.className = "form-msg" + (kind ? " is-" + kind : "");
+    }
+
+    function used(row) {
+      return row.was ? counts[row.was] || 0 : 0;
+    }
+
+    function paint(focusIndex, focusSel) {
+      list.innerHTML = rows
+        .map(function (row, i) {
+          var n = used(row);
+          return (
+            '<li class="cat-row" data-i="' + i + '">' +
+            '<span class="cat-pos" aria-hidden="true">' + (i + 1) + "</span>" +
+            '<label class="sr-only" for="cat-name-' + i + '">Category ' + (i + 1) + " name</label>" +
+            '<input id="cat-name-' + i + '" class="cat-name" maxlength="60" value="' + esc(row.name) + '">' +
+            '<span class="cat-count">' + (n ? n + (n === 1 ? " recipe" : " recipes") : "No recipes") +
+            (row.was && row.was !== row.name.trim() ? ' · was “' + esc(row.was) + '”' : "") +
+            (row.was ? "" : " · new") +
+            "</span>" +
+            '<span class="cat-btns">' +
+            '<button type="button" class="icon-btn" data-move="-1" aria-label="Move ' + esc(row.name) + ' up"' + (i === 0 ? " disabled" : "") + ">↑</button>" +
+            '<button type="button" class="icon-btn" data-move="1" aria-label="Move ' + esc(row.name) + ' down"' + (i === rows.length - 1 ? " disabled" : "") + ">↓</button>" +
+            '<button type="button" class="link-btn cat-remove" data-remove="1"' +
+            (n ? ' disabled title="' + n + (n === 1 ? " recipe uses" : " recipes use") + ' this category"' : "") +
+            ">Remove</button>" +
+            "</span>" +
+            "</li>"
+          );
+        })
+        .join("");
+      if (focusIndex != null) {
+        var li = list.querySelector('[data-i="' + focusIndex + '"]');
+        var el = li && li.querySelector(focusSel || ".cat-name");
+        if (el && !el.disabled) el.focus();
+      }
+    }
+
+    /* Categories some recipe uses that aren't in the list, with a quick add. */
+    function paintLoose() {
+      var inList = Object.create(null);
+      rows.forEach(function (r) {
+        if (r.was) inList[r.was] = true;
+        inList[r.name.trim()] = true;
+      });
+      var loose = Object.keys(counts).filter(function (c) {
+        return !inList[c];
+      });
+      document.getElementById("cat-loose").innerHTML = loose.length
+        ? '<div class="cat-loose"><p><strong>Used by recipes but not in the list:</strong></p><ul>' +
+          loose
+            .map(function (c) {
+              return (
+                "<li>" + esc(c) + " (" + counts[c] + (counts[c] === 1 ? " recipe" : " recipes") + ") " +
+                '<button type="button" class="link-btn" data-adopt="' + esc(c) + '">Add to list</button></li>'
+              );
+            })
+            .join("") +
+          "</ul><p class=\"muted\">To move those recipes into a category that’s already in the list, edit each recipe instead.</p></div>"
+        : "";
+    }
+
+    function refresh(focusIndex, focusSel) {
+      paint(focusIndex, focusSel);
+      paintLoose();
+    }
+    refresh();
+
+    list.addEventListener("input", function (e) {
+      if (!e.target.classList.contains("cat-name")) return;
+      var i = Number(e.target.closest(".cat-row").getAttribute("data-i"));
+      rows[i].name = e.target.value;
+      var note = e.target.parentNode.querySelector(".cat-count");
+      var n = used(rows[i]);
+      note.textContent =
+        (n ? n + (n === 1 ? " recipe" : " recipes") : "No recipes") +
+        (rows[i].was && rows[i].was !== rows[i].name.trim() ? " · was “" + rows[i].was + "”" : "") +
+        (rows[i].was ? "" : " · new");
+      say("");
+    });
+
+    list.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest("button") : null;
+      if (!btn || btn.disabled) return;
+      var i = Number(btn.closest(".cat-row").getAttribute("data-i"));
+      if (btn.hasAttribute("data-move")) {
+        var j = i + Number(btn.getAttribute("data-move"));
+        if (j < 0 || j >= rows.length) return;
+        var t = rows[i];
+        rows[i] = rows[j];
+        rows[j] = t;
+        refresh(j, '[data-move="' + btn.getAttribute("data-move") + '"]');
+      } else if (btn.hasAttribute("data-remove")) {
+        rows.splice(i, 1);
+        refresh(Math.min(i, rows.length - 1));
+      }
+      say("");
+    });
+
+    function addName(name) {
+      name = name.trim();
+      if (!name) return false;
+      var low = name.toLowerCase();
+      if (low === "hidden" || low === "other") {
+        say(CATEGORY_ERRORS.reserved_name, "error");
+        return false;
+      }
+      var clash = rows.some(function (r) {
+        return r.name.trim().toLowerCase() === low;
+      });
+      if (clash) {
+        say("“" + name + "” is already in the list.", "error");
+        return false;
+      }
+      // A name some recipes already use keeps those recipes with it.
+      rows.push({ name: name, was: counts[name] ? name : "" });
+      refresh();
+      say("Added “" + name + "”. Click Save categories to keep it.");
+      return true;
+    }
+
+    document.getElementById("cat-add").addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (addName(newInput.value)) newInput.value = "";
+      newInput.focus();
+    });
+
+    document.getElementById("cat-loose").addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest("[data-adopt]") : null;
+      if (btn) addName(btn.getAttribute("data-adopt"));
+    });
+
+    saveBtn.addEventListener("click", function () {
+      var seen = Object.create(null);
+      for (var i = 0; i < rows.length; i++) {
+        var name = rows[i].name.trim();
+        var low = name.toLowerCase();
+        var input = document.getElementById("cat-name-" + i);
+        if (!name || name.length > 60) {
+          say(CATEGORY_ERRORS.invalid_name, "error");
+          if (input) input.focus();
+          return;
+        }
+        if (low === "hidden" || low === "other") {
+          say(CATEGORY_ERRORS.reserved_name, "error");
+          if (input) input.focus();
+          return;
+        }
+        if (seen[low]) {
+          say("“" + name + "” is in the list twice. Change or remove one.", "error");
+          if (input) input.focus();
+          return;
+        }
+        seen[low] = true;
+      }
+      if (!rows.length) {
+        say("Keep at least one category.", "error");
+        return;
+      }
+      saveBtn.disabled = true;
+      say("Saving…");
+      var payload = rows.map(function (r) {
+        return { name: r.name.trim(), was: r.was || null };
+      });
+      window.Auth.token()
+        .then(function (token) {
+          if (!token) {
+            var e = new Error("not_signed_in");
+            e.key = "not_signed_in";
+            throw e;
+          }
+          return window.Reviews.api("/rpc/owner_save_categories", { method: "POST", token: token, body: { p_list: payload } });
+        })
+        .then(function (res) {
+          if (!res || !res.ok) {
+            var e = new Error((res && res.error) || "failed");
+            e.key = (res && res.error) || "failed";
+            throw e;
+          }
+          // Renames moved recipes saved on the site, so load everything again.
+          return loadSaved();
+        })
+        .then(function () {
+          renderCategories();
+          var m = document.getElementById("cat-msg");
+          if (m) {
+            m.textContent = "Saved. The new list is in the Category drop-down now.";
+            m.className = "form-msg is-ok";
+          }
+        })
+        .catch(function (err) {
+          var key = (err && err.key) || "";
+          if (!key && err && err.kind === "network") key = "network";
+          if (!key && err && err.kind === "server" && (err.status === 404 || err.code === "PGRST202")) key = "not_set_up";
+          if (!key && err && err.kind === "server" && (err.status === 401 || err.status === 403)) key = "not_signed_in";
+          saveBtn.disabled = false;
+          say(CATEGORY_ERRORS[key] || CATEGORY_ERRORS.failed, "error");
+        });
     });
   }
 
@@ -1087,6 +1436,7 @@
     }
     if (/^\/?add\/?$/.test(hash)) return { name: "add" };
     if (/^\/?family\/?$/.test(hash)) return { name: "family" };
+    if (/^\/?categories\/?$/.test(hash)) return { name: "categories" };
     var si = hash.match(/^\/?signin(?:\/(plan|shopping))?\/?$/);
     if (si) return { name: "signin", next: si[1] || "" };
     var plan = hash.match(/^\/?(plan|shopping)(?:\/(\d{4}-\d{2}-\d{2}))?\/?$/);
@@ -1116,6 +1466,7 @@
     if (current.name === "detail") renderDetail(current.id);
     else if (current.name === "add") renderAdd();
     else if (current.name === "family") renderFamily();
+    else if (current.name === "categories") renderCategories();
     else if (current.name === "edit") renderEdit(current.id);
     else if (current.name === "plan" || current.name === "shopping") renderPlanner(current.name, current.week);
     else if (current.name === "signin") {
@@ -1170,6 +1521,8 @@
           paintResults();
         } else if (current.name === "detail") {
           renderDetail(current.id);
+        } else if (current.name === "categories") {
+          renderCategories();
         }
       });
     });
@@ -1184,6 +1537,9 @@
       if (!app.querySelector(".recipe") || findRecipe(current.id) !== shownRecipe) renderDetail(current.id);
     } else if (current.name === "edit") {
       renderEdit(current.id);
+    } else if ((current.name === "add" || current.name === "categories") && app.querySelector(".loading")) {
+      if (current.name === "add") renderAdd();
+      else renderCategories();
     } else if (current.name === "plan" || current.name === "shopping") {
       // Saved recipes are in now; redraw so planned ones show their names.
       renderPlanner(current.name, current.week);

@@ -51,6 +51,8 @@
     [/main|dinner|entr[eé]e|supper|lunch/i, "Mains"]
   ];
 
+  /* Match a category found on a page or photo to one in the site's list.
+     Returns "" when nothing fits; the person then picks from the drop-down. */
   function pickCategory(found, existing) {
     var text = String(found || "").trim();
     if (!text) return "";
@@ -60,8 +62,9 @@
     for (var j = 0; j < CATEGORY_HINTS.length; j++) {
       if (CATEGORY_HINTS[j][0].test(text) && existing.indexOf(CATEGORY_HINTS[j][1]) !== -1) return CATEGORY_HINTS[j][1];
     }
-    return text.slice(0, 60);
+    return "";
   }
+
 
   var IMPORT_ERRORS = {
     bad_url: "That doesn’t look like a full web address. Copy the link from your browser’s address bar; it should start with https://.",
@@ -102,6 +105,9 @@
 
   function mount(root, ctx) {
     var cats = ctx.categories || [];
+    // A recipe being edited may still use a category that's no longer in the
+    // list; offer it so saving doesn't change it by accident.
+    var oldCat = ctx.edit && ctx.edit.category && cats.indexOf(ctx.edit.category) === -1 ? ctx.edit.category : "";
     var taken = Object.create(null);
     (ctx.takenIds || []).forEach(function (id) {
       taken[id] = true;
@@ -167,12 +173,15 @@
       field("…or a photo link", '<input name="image" type="url" placeholder="https://" maxlength="1000">', "wide",
         "Use a link to your own photo; pictures on other sites belong to their owners.") +
       field("Category",
-        '<select name="category">' +
+        '<select name="category" required>' +
         '<option value="">Choose a category</option>' +
         cats.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + "</option>"; }).join("") +
-        '<option value="__new">New category…</option>' +
-        "</select>" +
-        '<input name="newCategory" maxlength="60" placeholder="New category name" hidden>') +
+        (oldCat ? '<option value="' + esc(oldCat) + '">' + esc(oldCat) + " (no longer in the list)</option>" : "") +
+        "</select>",
+        "",
+        ctx.canEditCategories
+          ? '<a href="#/categories">Edit the category list</a>'
+          : "Missing one? Ask Art to add it.") +
       field("Tags", '<input name="tags" placeholder="e.g. beef, slow cooker" maxlength="300">', "", "Separate with commas.") +
       field("Total time (minutes)", '<input name="timeMinutes" type="number" min="1" max="10000" inputmode="numeric">') +
       field("Servings", '<input name="servings" maxlength="20" placeholder="e.g. 4 or 6-8">') +
@@ -202,7 +211,6 @@
     var saveBtn = root.querySelector("#save-btn");
     var saveMsg = root.querySelector("#save-msg");
     var catSelect = form.elements.category;
-    var newCat = form.elements.newCategory;
     var photoInput = form.elements.photoFile;
     var photoPreview = form.querySelector(".photo-preview");
     var photoRemove = form.querySelector(".photo-remove");
@@ -250,30 +258,13 @@
     }
 
     function setCategory(name) {
-      if (!name) {
-        catSelect.value = "";
-        newCat.hidden = true;
-        return;
-      }
-      if (cats.indexOf(name) !== -1) {
-        catSelect.value = name;
-        newCat.hidden = true;
-      } else {
-        catSelect.value = "__new";
-        newCat.hidden = false;
-        newCat.value = name;
-      }
+      catSelect.value = name && (cats.indexOf(name) !== -1 || name === oldCat) ? name : "";
     }
-
-    catSelect.addEventListener("change", function () {
-      newCat.hidden = catSelect.value !== "__new";
-      if (!newCat.hidden) newCat.focus();
-    });
 
     function fill(r, source) {
       r = r || {};
       form.elements.title.value = r.title || "";
-      setCategory(pickCategory(r.category, cats));
+      setCategory(oldCat && r.category === oldCat ? oldCat : pickCategory(r.category, cats));
       form.elements.tags.value = (r.tags || []).join(", ");
       form.elements.timeMinutes.value = r.timeMinutes || "";
       form.elements.servings.value = r.servings || "";
@@ -338,7 +329,7 @@
       if (saveBtn.disabled) return;
       var el = form.elements;
       var title = el.title.value.trim();
-      var category = catSelect.value === "__new" ? newCat.value.trim() : catSelect.value;
+      var category = catSelect.value;
       var ingredients = lines(el.ingredients.value);
       var steps = lines(el.steps.value);
       var image = el.image.value.trim();
@@ -347,6 +338,11 @@
       if (!title) {
         setMsg(saveMsg, SAVE_ERRORS.missing_title, "error");
         el.title.focus();
+        return;
+      }
+      if (!category) {
+        setMsg(saveMsg, "Choose a category.", "error");
+        catSelect.focus();
         return;
       }
       if (!ingredients.length && !steps.length) {
