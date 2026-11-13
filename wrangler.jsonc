@@ -25,5 +25,15 @@
     "SUPABASE_KEY": "sb_publishable_CEnbNpq3u_L-1A8XS715Gg_hCqXlV5S",
     "PHOTO_MODEL": "claude-sonnet-5-5"
   },
+  // Settings for Cloudflare's preview builds of branches other than main
+  // (used to try a change before merging). Same public values as above.
+  // A preview has no ANTHROPIC_API_KEY, so reading a photo won't work there.
+  "previews": {
+    "vars": {
+      "SUPABASE_URL": "https://klfiipyutunmlzawzicq.supabase.co",
+      "SUPABASE_KEY": "sb_publishable_CEnbNpq3u_L-1A8XS715Gg_hCqXlV5S",
+      "PHOTO_MODEL": "claude-sonnet-5-5"
+    }
+  },
   "observability": { "enabled": true }
 }

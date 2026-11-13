@@ -52,8 +52,9 @@ The easier way is **Add a recipe** on the site itself (next section); it needs n
 
 - `image` is a URL, a relative path such as `images/soup.jpg`, or `""` if there is no photo.
 - Use `null` for `timeMinutes` or `servings` when you do not want them shown.
-- `category` fills the category menu. `tags` are the small labels on each card.
+- `category` should be spelled exactly like one in the category list (see **Categories** below). `tags` are the small labels on each card.
 - Search checks the title, category, tags, ingredients, steps, and notes.
+- Add `hidden: true` to keep a recipe off the public site; only the site owner will see it (see **Hide a recipe** below).
 
 ## Add a recipe from a link (on the site)
 
@@ -105,6 +106,41 @@ While you're signed in, an **Edit** button also appears next to **Print** at the
 Any recipe can be edited this way, including the ones written in `recipes.js`. For those, the edited version is saved in Supabase under the same id and shown instead of the copy in `recipes.js`. That means a later change typed into `recipes.js` won't show for a recipe you've already edited on the site; make further changes to it on the site instead.
 
 **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-editing.sql`, and click **Run**. Until then, saving changes says editing isn't switched on yet.
+
+## Hide a recipe
+
+Hiding takes a recipe off the public site without deleting it: visitors and other contributors don't see it in the list, in search, in the meal planner, or at its link. **Only the site owner can hide a recipe, show it again, or see hidden recipes.** Reviews, edits and the recipe's own category are kept.
+
+**On the site:** sign in as the owner, open the recipe, and click **Hide from site** next to **Edit**. It moves to a grey **Hidden** category that only you see. To publish it again, open it and click **Show on site**; it goes back to its own category. Visitors see the change the next time they load the page.
+
+**In `recipes.js`:** add `hidden: true` to the recipe (for example, a draft you are still writing), and raise `recipes.js?v=` in `index.html`. Remove the line to publish it. Recipes hidden this way can't be shown from the site's button.
+
+Keep in mind that `recipes.js` is a public file, so anyone who opens it directly can still read a recipe written there, even when it's hidden. Recipes added on the site and then hidden are never sent to anyone but the owner.
+
+**One-time setup:** in Supabase open **SQL Editor** and paste `supabase/add-recipe-hiding.sql`. At the very bottom, change `YOUR-EMAIL@example.com` to the email you sign in to the site with, then click **Run**. Until then, nobody sees the hide button (`hidden: true` in `recipes.js` still works). To make someone else the owner later, run the last block of that file again with their email.
+
+How it works: `private.site_owner` holds the owner's account. The site asks `am_i_site_owner()` after sign-in, hides with `owner_set_recipe_hidden()`, and loads hidden site recipes with `owner_hidden_recipes()`; all three check the owner in the database, so the rule can't be got around from the browser. `public.hidden_recipes` is the list of hidden ids. Nobody can read it from the site: the page only asks `hidden_among()` which of the recipes in `recipes.js` are hidden, so the names of hidden recipes added on the site never leave the database. The ratings totals (`review_stats`) also leave hidden recipes out.
+
+## Categories
+
+Everyone who adds or edits a recipe picks its category from a **drop-down list**; they can't type a new one. Only the site owner can change that list.
+
+**Edit the list:** sign in as the owner and click **Edit categories** (next to **Sort** on the home page, or under the Category drop-down on the add/edit form). You can:
+
+- **Add** a category.
+- **Rename** one by typing over its name. Recipes in it move with it, including ones written in `recipes.js` (the site remembers the old name).
+- **Reorder** with the arrows. The home page tabs and the drop-down follow this order.
+- **Remove** one once no recipe uses it. The page shows how many recipes use each category.
+
+If some recipes use a category that isn't in the list (for example an old one in `recipes.js`), the page lists it with an **Add to list** button. Nothing changes until you click **Save categories**. "Hidden" and "Other" are reserved for the site.
+
+**One-time setup:** run `supabase/add-recipe-hiding.sql` first (it sets the owner). Then in Supabase open **SQL Editor**, paste `supabase/add-categories.sql`, and click **Run**. It starts the list with Breakfast, Bread, Mains, Sides, Soups & Stews, Pickles and Spice Blends. Until it's run, the drop-down offers the categories recipes already use.
+
+How it works: `public.recipe_categories` holds the list (name, order, and old names in `also_matches`); anyone can read it. `owner_save_categories()` saves the whole list and checks in the database that the caller is the owner. A database check (`recipes_category_check`) refuses any recipe saved with a category that isn't in the list; edits that keep a recipe's existing category are still allowed.
+
+## Keep screen on
+
+Every recipe page has a **Keep screen on** switch next to **Print**, so a phone or tablet doesn't dim or lock while someone cooks. Once switched on, it stays on for other recipes opened in the same tab, and turns itself off when leaving recipe pages. It uses the browser's Screen Wake Lock feature, which works in current Chrome, Edge, Safari (iPhone and iPad with iOS 16.4 or later) and Firefox. On browsers without it, the switch doesn't appear. Battery saver mode can stop it from working; the page says so if that happens.
 
 ## Barcelona tile
 

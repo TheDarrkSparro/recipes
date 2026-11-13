@@ -44,7 +44,7 @@ const SYSTEM = [
 
 function recipeTool(categories) {
   const catHelp = categories.length
-    ? "Pick one of the site's existing categories if one fits: " + categories.join(", ") + ". Otherwise suggest a short new one."
+    ? "Pick the best fit from the site's categories, spelled exactly as here: " + categories.join(", ") + ". Leave empty if none fit."
     : "A short category such as Breakfast, Bread, Mains or Sides.";
   return {
     name: "record_recipe",
