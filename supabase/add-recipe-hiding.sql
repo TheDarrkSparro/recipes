@@ -15,6 +15,8 @@
 --                                 in recipes.js), says which are hidden. It can't
 --                                 list hidden recipes, so their names never leak.
 --   public.am_i_site_owner()      lets the site ask "is the signed-in person the owner?"
+--   public.review_stats           (updated) the ratings totals now leave out
+--                                 hidden recipes too.
 --   public.owner_set_recipe_hidden(id, hidden)
 --                                 hides or shows one recipe (owner only). Works for
 --                                 recipes added on the site and ones in recipes.js.
@@ -102,6 +104,21 @@ create policy "Visitors can read visible recipes"
 -- Earlier draft of this file used these names; remove them if present.
 drop function if exists public.contributor_set_recipe_hidden(text, boolean);
 drop function if exists public.contributor_hidden_recipes();
+
+-- ---------- Ratings totals skip hidden recipes ----------
+-- The same view as before (average and count per recipe, hidden reviews left
+-- out, run with the visitor's own permissions), plus: hidden recipes are left
+-- out, so their ids don't show up in the public totals.
+create or replace view public.review_stats
+with (security_invoker = true)
+as
+select recipe_id,
+       round(avg(rating), 2) as avg_rating,
+       (count(*))::integer as review_count
+from public.reviews
+where hidden = false
+  and not public.recipe_is_hidden(recipe_id)
+group by recipe_id;
 
 -- ---------- Hide or show a recipe (owner only) ----------
 create or replace function public.owner_set_recipe_hidden(p_id text, p_hidden boolean)
