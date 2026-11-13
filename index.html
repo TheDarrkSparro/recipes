@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
   <a class="skip" href="#app">Skip to recipes</a>
@@ -25,6 +25,7 @@
       </a>
       <nav class="topnav" aria-label="Main">
         <a class="nav-link" href="#/" data-nav="list">Recipes</a>
+        <a class="nav-link nav-plan" href="#/plan" data-nav="plan"><span class="nav-long">Meal plan</span><span class="nav-short" aria-hidden="true">Plan</span></a>
         <a class="btn btn-small" href="#/add" data-nav="add">
           <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
           <span class="add-long">Add a recipe</span><span class="add-short" aria-hidden="true">Add</span>
@@ -48,7 +49,9 @@
   <script src="config.js?v=8"></script>
   <script src="reviews.js?v=9"></script>
   <script src="auth.js?v=1"></script>
+  <script src="ingredients.js?v=1"></script>
+  <script src="planner.js?v=1"></script>
   <script src="add-recipe.js?v=19"></script>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

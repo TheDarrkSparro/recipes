@@ -582,6 +582,7 @@
       '<button type="button" class="btn btn-quiet" data-print="1">' +
       '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5.5 7V3h9v4M5.5 14h-2V8.5a1.5 1.5 0 0 1 1.5-1.5h10a1.5 1.5 0 0 1 1.5 1.5V14h-2M5.5 11.5h9V17h-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
       "Print</button>" +
+      '<span class="plan-add" id="plan-add"></span>' +
       (signedIn()
         ? '<a class="btn btn-quiet" href="#/edit/' + esc(encodeURIComponent(rid)) + '">' +
           '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M12.8 4.2l3 3L7.5 15.5l-3.7.7.7-3.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
@@ -686,6 +687,13 @@
       }
     });
 
+    if (window.Planner && rid) {
+      window.Planner.mountAddButton(document.getElementById("plan-add"), { id: rid, title: titleOf(recipe) }, function (pid) {
+        var r = findRecipe(pid);
+        return r ? titleOf(r) : "a recipe";
+      });
+    }
+
     var reviewsSection = document.getElementById("reviews");
     if (window.Reviews && rid) {
       try {
@@ -788,6 +796,33 @@
     });
   }
 
+  /* ---------- Meal plan and shopping list (planner.js) ---------- */
+
+  function plannerRecipes() {
+    return recipes
+      .map(function (r) {
+        return {
+          id: recipeId(r),
+          title: titleOf(r),
+          category: str(r.category) || "Other",
+          ingredients: stringList(r.ingredients)
+        };
+      })
+      .filter(function (r) {
+        return r.id;
+      });
+  }
+
+  function renderPlanner(kind, week) {
+    if (!window.Planner || !window.Ingredients) {
+      app.innerHTML = emptyBlock("The meal planner isn't available", "Its script didn't load. Refresh the page and try again.");
+      return;
+    }
+    var ctx = { recipes: plannerRecipes(), loading: savedState === "loading", week: week };
+    if (kind === "plan") window.Planner.mountPlan(app, ctx);
+    else window.Planner.mountShopping(app, ctx);
+  }
+
   /* ---------- Routing ---------- */
 
   var current = { name: "list" };
@@ -802,6 +837,8 @@
     }
     if (/^\/?add\/?$/.test(hash)) return { name: "add" };
     if (/^\/?signin\/?$/.test(hash)) return { name: "signin" };
+    var plan = hash.match(/^\/?(plan|shopping)(?:\/(\d{4}-\d{2}-\d{2}))?\/?$/);
+    if (plan) return { name: plan[1], week: plan[2] || "" };
     if (/^\/?set-password\/?$/.test(hash)) return { name: "set-password" };
     var match = hash.match(/^\/?recipe\/([^/]+)\/?$/);
     if (match) return { name: "detail", id: match[1] };
@@ -812,7 +849,8 @@
 
   function markNav() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-nav]"), function (a) {
-      var on = a.getAttribute("data-nav") === current.name;
+      var nav = a.getAttribute("data-nav");
+      var on = nav === current.name || (nav === "plan" && current.name === "shopping");
       if (on) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     });
@@ -826,6 +864,7 @@
     if (current.name === "detail") renderDetail(current.id);
     else if (current.name === "add") renderAdd();
     else if (current.name === "edit") renderEdit(current.id);
+    else if (current.name === "plan" || current.name === "shopping") renderPlanner(current.name, current.week);
     else if (current.name === "signin") {
       if (window.Auth) window.Auth.renderSignIn(app, { next: "#/add" });
       else renderList();
@@ -866,6 +905,9 @@
       if (!app.querySelector(".recipe") || findRecipe(current.id) !== shownRecipe) renderDetail(current.id);
     } else if (current.name === "edit") {
       renderEdit(current.id);
+    } else if (current.name === "plan" || current.name === "shopping") {
+      // Saved recipes are in now; redraw so planned ones show their names.
+      renderPlanner(current.name, current.week);
     }
   });
 })();

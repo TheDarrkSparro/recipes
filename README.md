@@ -106,6 +106,15 @@ Any recipe can be edited this way, including the ones written in `recipes.js`. F
 
 **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-editing.sql`, and click **Run**. Until then, saving changes says editing isn't switched on yet.
 
+## Meal plan and shopping list
+
+Anyone can plan the week's dinners and make a shopping list. No account is needed. Everything is saved in that person's browser on that device (`localStorage`), so it doesn't follow them to another phone or computer. Clearing the browser's site data clears it.
+
+- **Meal plan** (`#/plan`, in the header): one dinner per day, Sunday to Saturday, with arrows for other weeks. Pick a recipe or write a note ("Leftovers"). Recipe pages have an **Add to meal plan** button for the next 14 days.
+- **Shopping list** (`#/shopping`): every ingredient from that week's dinners, grouped by ingredient with each recipe's amount shown side by side (amounts aren't added up, since units often differ). Tick **already have** items, add your own items, then **Print** or **Copy list**. Both leave out what's already ticked.
+
+Files: `planner.js` (pages and storage), `ingredients.js` (splits "1 medium onion, diced" into amount "1 medium" and ingredient "onion" so matching ingredients group together). If two recipes write the same thing differently ("kosher salt" vs "salt"), they show as separate lines.
+
 ## Contributor accounts
 
 Reading recipes and leaving reviews need no account. **Adding and editing recipes, uploading dish photos, and reading recipe cards need a contributor account.** Accounts are invite-only, and people sign in with their email and a password. The owner code is no longer used.
