@@ -269,6 +269,57 @@
       });
   }
 
+  /* ---------- Cook profiles (supabase/add-profiles.sql) ----------
+     profilesByName: public profile fields, keyed by lower-case cook name.
+     familyById: birthday, phone and email (signed-in contributors only),
+     plus is_me, and linked_account for the owner. */
+  var profilesByName = Object.create(null);
+  var familyById = Object.create(null);
+  var profilesReady = false;
+
+  function loadProfiles() {
+    return window.Reviews.api("/cook_profiles?select=id,name,photo,bio,specialty,hometown,relation,updated_at&order=name&limit=500")
+      .then(function (rows) {
+        var next = Object.create(null);
+        (Array.isArray(rows) ? rows : []).forEach(function (r) {
+          if (r && r.id && str(r.name)) next[str(r.name).toLowerCase()] = r;
+        });
+        profilesByName = next;
+        profilesReady = true;
+      })
+      .catch(function () {
+        /* Not set up yet: no profiles. */
+      });
+  }
+
+  function loadFamilyDetails() {
+    familyById = Object.create(null);
+    if (!signedIn() || !window.Auth.token) return Promise.resolve();
+    return window.Auth.token()
+      .then(function (token) {
+        if (!token) return null;
+        return window.Reviews.api("/rpc/family_profile_details", { method: "POST", token: token, body: {} });
+      })
+      .then(function (res) {
+        if (!res || !res.ok || !Array.isArray(res.rows)) return;
+        res.rows.forEach(function (r) {
+          if (r && r.id) familyById[r.id] = r;
+        });
+      })
+      .catch(function () {
+        /* Not set up yet. */
+      });
+  }
+
+  function profileFor(name) {
+    var n = str(name).toLowerCase();
+    return (n && profilesByName[n]) || null;
+  }
+
+  function cookHref(name) {
+    return "#/cook/" + encodeURIComponent(str(name));
+  }
+
   function loadContributorDetails() {
     contribDetails = Object.create(null);
     if (!ownerMode()) return Promise.resolve();
@@ -342,9 +393,9 @@
       allLoaded = true;
       return Promise.resolve();
     }
-    var extras = Promise.all([loadHiddenIds(), loadHiddenSaved(), loadCategories(), loadContributors()]).then(function () {
+    var extras = Promise.all([loadHiddenIds(), loadHiddenSaved(), loadCategories(), loadContributors(), loadProfiles()]).then(function () {
       // The owner check happens in loadHiddenSaved, so this goes after it.
-      return loadContributorDetails();
+      return Promise.all([loadContributorDetails(), loadFamilyDetails()]);
     });
     var rows = window.Reviews.api(
       "/recipes?select=id,title,category,tags,time_minutes,servings,image,ingredients,steps,notes,source_url,created_at&order=created_at.desc&limit=500"
@@ -1171,7 +1222,7 @@
     return (
       '<div class="contrib" id="contrib">' +
       (name
-        ? '<p class="contrib-line">Contributed by <strong>' + esc(name) + "</strong></p>" +
+        ? '<p class="contrib-line">Contributed by <a class="contrib-name" href="' + esc(cookHref(name)) + '">' + esc(name) + "</a></p>" +
           '<p class="print-only print-kitchen">From the kitchen of <strong>' + esc(name) + "</strong></p>"
         : '<p class="contrib-line contrib-empty">No contributor set</p>') +
       (owner
@@ -1526,6 +1577,14 @@
       }
       (byName[name] = byName[name] || []).push(r);
     });
+    // Cooks with a profile but no recipes yet still get a card.
+    Object.keys(profilesByName).forEach(function (k) {
+      var name = str(profilesByName[k].name);
+      var have = Object.keys(byName).some(function (n) {
+        return n.toLowerCase() === k;
+      });
+      if (name && !have) byName[name] = [];
+    });
     var cooks = Object.keys(byName).map(function (name) {
       var list = byName[name];
       var cats = Object.create(null);
@@ -1551,7 +1610,8 @@
         count: list.length,
         cats: catNames,
         catCounts: cats,
-        signature: catNames[0],
+        signature: catNames[0] || "",
+        profile: profileFor(name),
         reviews: reviews,
         avg: reviews ? weighted / reviews : 0,
         loved: loved,
@@ -1595,6 +1655,16 @@
     return awards;
   }
 
+  /* A cook's photo, or their initials in a coloured circle. */
+  function cookAvatar(name, profile, cls) {
+    var raw = profile ? str(profile.photo) : "";
+    // Profile photos are uploaded pictures stored as image data, or https links.
+    var photo = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(raw) ? raw : safeSrc(raw);
+    return photo
+      ? '<img class="' + cls + '" src="' + esc(photo) + '" alt="">'
+      : '<span class="' + cls + '" aria-hidden="true">' + esc(initials(name)) + "</span>";
+  }
+
   function renderCooks() {
     document.title = "Our cooks · The Dark Sparrow Eats";
     if (!allLoaded) {
@@ -1626,7 +1696,11 @@
       '<header class="cooks-head">' +
       '<h1 class="cooks-title">Our cooks</h1>' +
       '<p class="cooks-sub">The people behind the recipes, and how their dishes are doing.</p>' +
-      "</header>";
+      (signedIn()
+        ? '<p class="cooks-links"><a href="#/me">My profile</a>' + (ownerMode() ? ' · <a href="#/profiles">Manage profiles</a>' : "") + "</p>"
+        : "") +
+      "</header>" +
+      birthdaysHtml();
 
     if (!cooks.length) {
       app.innerHTML =
@@ -1673,9 +1747,13 @@
           return (
             '<article class="cook-card hue-' + hue(c.name) + '" id="cook-' + esc(cookSlug(c.name)) + '">' +
             '<header class="cook-top">' +
-            '<span class="cook-avatar" aria-hidden="true">' + esc(initials(c.name)) + "</span>" +
-            '<div><h2 class="cook-name">' + esc(c.name) + "</h2>" +
-            '<p class="cook-sig">Signature: <strong>' + esc(c.signature) + "</strong></p></div>" +
+            cookAvatar(c.name, c.profile, "cook-avatar") +
+            '<div><h2 class="cook-name"><a href="' + esc(cookHref(c.name)) + '">' + esc(c.name) + "</a></h2>" +
+            (c.profile && (c.profile.relation || c.profile.hometown)
+              ? '<p class="cook-sig">' + esc([str(c.profile.relation), c.profile.hometown ? "from " + str(c.profile.hometown) : ""].filter(Boolean).join(", ")) + "</p>"
+              : "") +
+            (c.signature ? '<p class="cook-sig">Signature: <strong>' + esc(c.signature) + "</strong></p>" : "") +
+            "</div>" +
             "</header>" +
             (aw.length
               ? '<ul class="cook-awards">' +
@@ -1696,7 +1774,13 @@
               ? '<p class="cook-pick"><span>Newest addition</span><a href="#/recipe/' + esc(encodeURIComponent(recipeId(c.newest))) + '">' + esc(titleOf(c.newest)) + "</a>" +
                 (shortDate(realAdded(c.newest)) ? " <small>" + esc(shortDate(realAdded(c.newest))) + "</small>" : "") + "</p>"
               : "") +
-            '<details class="cook-recipes"><summary>All ' + c.count + (c.count === 1 ? " recipe" : " recipes") + "</summary><ul>" +
+            (c.count ? "" : '<p class="cook-pick muted">No recipes credited yet.</p>') +
+            '<p class="cook-links"><a href="' + esc(cookHref(c.name)) + '">' + (c.profile ? "View profile" : "View page") + "</a>" +
+            (ownerMode()
+              ? ' · <a href="' + (c.profile ? "#/profiles/edit/" + esc(c.profile.id) : "#/profiles/new/" + esc(encodeURIComponent(c.name))) + '">' + (c.profile ? "Edit profile" : "Create profile") + "</a>"
+              : "") +
+            "</p>" +
+            (c.count ? '<details class="cook-recipes"><summary>All ' + c.count + (c.count === 1 ? " recipe" : " recipes") + "</summary><ul>" +
             c.recipes
               .map(function (r) {
                 var st = statFor(r);
@@ -1704,7 +1788,7 @@
                   '<span class="cook-r-meta">' + esc(categoryOf(r)) + (st.count ? " · " + stars(st.avg) : "") + "</span></li>";
               })
               .join("") +
-            "</ul></details>" +
+            "</ul></details>" : "") +
             "</article>"
           );
         })
@@ -1723,6 +1807,35 @@
       var card = b && document.getElementById("cook-" + b.getAttribute("data-cook"));
       if (card && card.scrollIntoView) card.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  }
+
+  /* Signed-in family: birthdays in the next 30 days. */
+  function birthdaysHtml() {
+    if (!signedIn()) return "";
+    var soon = [];
+    Object.keys(profilesByName).forEach(function (k) {
+      var p = profilesByName[k];
+      var f = familyById[p.id];
+      var days = daysUntilBirthday(f);
+      if (days != null && days <= 30) soon.push({ p: p, f: f, days: days });
+    });
+    if (!soon.length) return "";
+    soon.sort(function (a, b) {
+      return a.days - b.days;
+    });
+    return (
+      '<aside class="bdays"><h2><span aria-hidden="true">🎂</span> Birthdays coming up</h2><ul>' +
+      soon
+        .map(function (b) {
+          return (
+            '<li><a href="' + esc(cookHref(b.p.name)) + '">' + esc(b.p.name) + "</a> " +
+            '<span class="muted">' + esc(birthdayText(b.f)) + " · " +
+            (b.days === 0 ? "today!" : b.days === 1 ? "tomorrow" : "in " + b.days + " days") + "</span></li>"
+          );
+        })
+        .join("") +
+      "</ul></aside>"
+    );
   }
 
   /* Owner only: which site accounts added recipes. */
@@ -1752,6 +1865,526 @@
           "</tbody></table>"
         : '<p class="muted">None recorded yet. New recipes are recorded from now on.</p>') +
       "</section>"
+    );
+  }
+
+
+  /* ---------- Cook profile pages ---------- */
+
+  var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  function birthdayText(f) {
+    var m = Number(f && f.birthday_month);
+    var d = Number(f && f.birthday_day);
+    return m >= 1 && m <= 12 && d >= 1 ? MONTHS[m - 1] + " " + d : "";
+  }
+
+  /* Days from today until the next birthday (0 = today), or null. */
+  function daysUntilBirthday(f) {
+    var m = Number(f && f.birthday_month);
+    var d = Number(f && f.birthday_day);
+    if (!(m >= 1 && d >= 1)) return null;
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var y = today.getFullYear();
+    var next = new Date(y, m - 1, d);
+    // 29 February in a non-leap year: celebrate on 1 March.
+    if (next.getMonth() !== m - 1) next = new Date(y, m, 1);
+    if (next < today) {
+      next = new Date(y + 1, m - 1, d);
+      if (next.getMonth() !== m - 1) next = new Date(y + 1, m, 1);
+    }
+    return Math.round((next - today) / 86400000);
+  }
+
+  function canEditProfile(profile) {
+    if (!profile) return false;
+    if (ownerMode()) return true;
+    var f = familyById[profile.id];
+    return !!(f && f.is_me);
+  }
+
+  function familyBoxHtml(profile) {
+    if (!profile) return "";
+    if (!signedIn()) {
+      return (
+        '<aside class="family-box is-locked"><h2>Family details</h2>' +
+        '<p>Birthday and contact details are shown to signed-in family. <a href="#/signin">Sign in</a></p></aside>'
+      );
+    }
+    var f = familyById[profile.id] || {};
+    var rows = [];
+    var bday = birthdayText(f);
+    if (bday) {
+      var days = daysUntilBirthday(f);
+      rows.push(
+        "<div><dt>Birthday</dt><dd>" + esc(bday) +
+          (days === 0 ? ' <span class="bday-soon">🎂 Today!</span>' : days != null && days <= 30 ? ' <span class="bday-soon">in ' + days + (days === 1 ? " day" : " days") + "</span>" : "") +
+          "</dd></div>"
+      );
+    }
+    if (str(f.phone)) rows.push('<div><dt>Phone</dt><dd><a href="tel:' + esc(str(f.phone).replace(/[^0-9+]/g, "")) + '">' + esc(f.phone) + "</a></dd></div>");
+    if (str(f.email)) rows.push('<div><dt>Email</dt><dd><a href="mailto:' + esc(f.email) + '">' + esc(f.email) + "</a></dd></div>");
+    if (ownerMode()) {
+      rows.push("<div><dt>Site account</dt><dd>" + (f.linked_account ? esc(f.linked_account) : '<span class="muted">Not linked</span>') + "</dd></div>");
+    }
+    return (
+      '<aside class="family-box"><h2>Family details <small>Only signed-in family see this</small></h2>' +
+      (rows.length ? "<dl>" + rows.join("") + "</dl>" : '<p class="muted">No birthday or contact details yet.</p>') +
+      "</aside>"
+    );
+  }
+
+  function renderCookProfile(rawName) {
+    var name = str(rawName);
+    document.title = name + " · The Dark Sparrow Eats";
+    if (!allLoaded) {
+      app.innerHTML = '<p class="loading">Opening the profile…</p>';
+      return;
+    }
+    if (!statsMap && window.Reviews && window.Reviews.getStats && !renderCookProfile._asked) {
+      renderCookProfile._asked = true;
+      window.Reviews.getStats()
+        .then(function (map) {
+          statsMap = map || null;
+          if (current.name === "cook") renderCookProfile(current.id);
+        })
+        .catch(function () {});
+    }
+    var cook = null;
+    cookStats().cooks.forEach(function (c) {
+      if (c.name.toLowerCase() === name.toLowerCase()) cook = c;
+    });
+    var profile = profileFor(name);
+    var back = '<a class="back" href="#/cooks">' + backArrow() + "All cooks</a>";
+    if (!cook && !profile) {
+      app.innerHTML = back + emptyBlock("No cook by that name", "The name may have changed. See everyone on the <a href=\"#/cooks\">cooks page</a>.");
+      return;
+    }
+    var shownName = (profile && str(profile.name)) || (cook && cook.name) || name;
+    var list = cook ? cook.recipes : [];
+    var top = topIds();
+    var facts = [];
+    if (profile && str(profile.relation)) facts.push(esc(profile.relation));
+    if (profile && str(profile.hometown)) facts.push("From " + esc(profile.hometown));
+    var editLink = "";
+    if (canEditProfile(profile)) {
+      var mine = familyById[profile.id] && familyById[profile.id].is_me;
+      editLink = '<a class="btn btn-small" href="' + (mine ? "#/me" : "#/profiles/edit/" + esc(profile.id)) + '">Edit profile</a>';
+    } else if (!profile && ownerMode()) {
+      editLink = '<a class="btn btn-small" href="#/profiles/new/' + esc(encodeURIComponent(shownName)) + '">Create profile</a>';
+    }
+
+    app.innerHTML =
+      back +
+      '<article class="cook-profile hue-' + hue(shownName) + '">' +
+      '<header class="cp-head">' +
+      cookAvatar(shownName, profile, "cp-photo") +
+      '<div class="cp-id">' +
+      '<h1 class="cp-name">' + esc(shownName) + "</h1>" +
+      (facts.length ? '<p class="cp-facts">' + facts.join(" · ") + "</p>" : "") +
+      (profile && str(profile.specialty) ? '<p class="cp-specialty"><span>Specialty</span> ' + esc(profile.specialty) + "</p>" : "") +
+      (editLink ? '<p class="cp-actions">' + editLink + "</p>" : "") +
+      "</div>" +
+      "</header>" +
+      '<div class="cp-body">' +
+      '<div class="cp-main">' +
+      (profile && str(profile.bio)
+        ? '<section class="cp-bio"><h2>About ' + esc(shownName) + "</h2>" +
+          str(profile.bio).split(/\n{2,}/).map(function (para) {
+            return "<p>" + esc(para).replace(/\n/g, "<br>") + "</p>";
+          }).join("") +
+          "</section>"
+        : !profile ? '<p class="muted">No profile yet.' + (ownerMode() ? " Use <strong>Create profile</strong> to add one." : "") + "</p>" : "") +
+      "</div>" +
+      '<div class="cp-side">' +
+      (cook
+        ? '<dl class="cook-stats cp-stats">' +
+          "<div><dt>Recipes</dt><dd>" + cook.count + "</dd></div>" +
+          "<div><dt>Rating</dt><dd>" + (cook.reviews ? stars(cook.avg) : "–") + "</dd></div>" +
+          "<div><dt>Reviews</dt><dd>" + cook.reviews + "</dd></div>" +
+          "</dl>"
+        : "") +
+      familyBoxHtml(profile) +
+      "</div>" +
+      "</div>" +
+      '<section class="cp-recipes"><h2>' + (list.length ? esc(shownName) + "’s recipes" : "Recipes") + "</h2>" +
+      (list.length
+        ? '<ul class="cards">' + list.map(function (r) { return card(r, !!top[recipeId(r)]); }).join("") + "</ul>"
+        : '<p class="muted">No recipes credited to ' + esc(shownName) + " yet.</p>") +
+      "</section>" +
+      "</article>";
+    if (window.Reviews && window.Reviews.paintCards) window.Reviews.paintCards(app);
+  }
+
+  /* ---------- The profile form (used by "My profile" and by the owner) ---------- */
+
+  var PROFILE_ERRORS = {
+    not_signed_in: "Your sign-in has ended. Sign in again, then save.",
+    not_contributor: "This account can’t save profiles.",
+    not_owner: "Only the site owner can change other people’s profiles.",
+    invalid_name: "Enter a name of 80 characters or fewer (not “Hidden” or “Other”).",
+    name_taken: "Another profile already uses that name. Choose a different one.",
+    name_is_credited: "Recipes are already credited to that name. If they’re yours, ask Art to link that profile to your account.",
+    invalid_photo: "That photo couldn’t be used. Try a JPG or PNG picture.",
+    photo_too_big: "That photo is too large. Try a smaller picture.",
+    too_long: "One of the fields is too long. Shorten it and try again.",
+    invalid_email: "That email address doesn’t look right.",
+    invalid_phone: "Phone numbers can use digits, spaces, +, -, ( ) and dots.",
+    invalid_birthday: "Pick both a month and a day for the birthday (or neither).",
+    not_found: "That profile no longer exists. Refresh the page.",
+    not_set_up: "Profiles aren’t switched on yet. In Supabase, run supabase/add-profiles.sql (see README.md).",
+    network: "Couldn’t reach the recipe database. Check your connection and try again.",
+    failed: "That didn’t save. Refresh the page and try again."
+  };
+
+  function profileRpc(path, body) {
+    return window.Auth.token()
+      .then(function (token) {
+        if (!token) {
+          var e = new Error("not_signed_in");
+          e.key = "not_signed_in";
+          throw e;
+        }
+        return window.Reviews.api(path, { method: "POST", token: token, body: body || {} });
+      })
+      .then(function (res) {
+        if (!res || res.ok === false) {
+          var e = new Error((res && res.error) || "failed");
+          e.key = (res && res.error) || "failed";
+          throw e;
+        }
+        return res;
+      })
+      .catch(function (err) {
+        var key = (err && err.key) || "";
+        if (!key && err && err.kind === "network") key = "network";
+        if (!key && err && err.kind === "server" && (err.status === 404 || err.code === "PGRST202")) key = "not_set_up";
+        if (!key && err && err.kind === "server" && (err.status === 401 || err.status === 403)) key = "not_signed_in";
+        var out = new Error(PROFILE_ERRORS[key] || PROFILE_ERRORS.failed);
+        out.key = key || "failed";
+        throw out;
+      });
+  }
+
+  /* Shrink a picked photo to at most 480px and return a JPEG data URL. */
+  function shrinkPhoto(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\//.test(file.type)) {
+        reject(new Error("Choose a picture file (JPG, PNG or similar)."));
+        return;
+      }
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        var max = 480;
+        var scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        var w = Math.max(1, Math.round(img.naturalWidth * scale));
+        var h = Math.max(1, Math.round(img.naturalHeight * scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("That picture couldn’t be opened. Try a JPG or PNG."));
+      };
+      img.src = url;
+    });
+  }
+
+  function profileFormHtml(p, f, mode) {
+    p = p || {};
+    f = f || {};
+    var owner = mode === "owner";
+    var monthOpts = '<option value="">Month</option>' + MONTHS.map(function (m, i) {
+      return '<option value="' + (i + 1) + '"' + (Number(f.birthday_month) === i + 1 ? " selected" : "") + ">" + m + "</option>";
+    }).join("");
+    var dayOpts = '<option value="">Day</option>';
+    for (var d = 1; d <= 31; d++) dayOpts += '<option value="' + d + '"' + (Number(f.birthday_day) === d ? " selected" : "") + ">" + d + "</option>";
+    function input(label, nameAttr, value, extra, help) {
+      return (
+        '<label class="field"><span class="field-label">' + label + "</span>" +
+        "<input name=\"" + nameAttr + '" value="' + esc(value || "") + '"' + (extra || "") + ">" +
+        (help ? '<span class="field-help">' + help + "</span>" : "") +
+        "</label>"
+      );
+    }
+    return (
+      '<form class="profile-form" id="profile-form" novalidate>' +
+      '<fieldset class="pf-group"><legend>Public <small>Anyone can see these</small></legend>' +
+      '<div class="pf-photo">' +
+      '<div class="pf-photo-preview" id="pf-preview">' + cookAvatar(p.name || "?", p, "cp-photo") + "</div>" +
+      '<div class="pf-photo-ctrl">' +
+      '<label class="btn btn-quiet btn-small pf-file">Choose a photo<input type="file" accept="image/*" id="pf-file"></label>' +
+      '<button type="button" class="link-btn" id="pf-remove"' + (p.photo ? "" : " hidden") + ">Remove photo</button>" +
+      '<input type="hidden" name="photo" value="' + esc(p.photo || "") + '">' +
+      '<span class="field-help">A square-ish face photo works best. It’s made smaller automatically.</span>' +
+      "</div></div>" +
+      input("Name", "name", p.name, ' maxlength="80" required autocomplete="name"', owner ? "Use the same name as on their recipes’ “Contributed by”, so they connect." : "This is how your recipes are credited.") +
+      input("Relation", "relation", p.relation, ' maxlength="80" placeholder="e.g. Art’s sister"') +
+      input("Hometown", "hometown", p.hometown, ' maxlength="80" placeholder="e.g. Colfax, Washington"') +
+      input("Specialty", "specialty", p.specialty, ' maxlength="120" placeholder="e.g. Sunday pot roast"') +
+      '<label class="field"><span class="field-label">About</span>' +
+      '<textarea name="bio" rows="5" maxlength="1500" placeholder="A few lines about ' + (owner ? "them" : "you") + ' and ' + (owner ? "their" : "your") + ' cooking">' + esc(p.bio || "") + "</textarea></label>" +
+      "</fieldset>" +
+      '<fieldset class="pf-group pf-family"><legend>Family only <small>Only signed-in family see these</small></legend>' +
+      '<div class="field"><span class="field-label">Birthday</span><div class="pf-bday">' +
+      '<select name="birthday_month" aria-label="Birthday month">' + monthOpts + "</select>" +
+      '<select name="birthday_day" aria-label="Birthday day">' + dayOpts + "</select></div>" +
+      '<span class="field-help">Month and day only.</span></div>' +
+      input("Phone", "phone", f.phone, ' type="tel" maxlength="30" autocomplete="tel"') +
+      input("Email", "email", f.email, ' type="email" maxlength="120" autocomplete="email"',
+        owner ? "If you invite this email to the site, their account links to this profile when they accept." : "") +
+      (owner && p.id
+        ? '<p class="pf-linked">Site account: ' + (f.linked_account ? "<strong>" + esc(f.linked_account) + "</strong>" : "not linked yet") + "</p>" +
+          (f.linked_account
+            ? '<label class="pf-check"><input type="checkbox" name="unlink"> Unlink that account (it links again if the email above still matches)</label>'
+            : "")
+        : "") +
+      "</fieldset>" +
+      '<div class="form-foot">' +
+      '<button type="submit" class="btn">Save profile</button>' +
+      '<a class="link-btn" href="' + (p.name ? esc(cookHref(p.name)) : owner ? "#/profiles" : "#/") + '">Cancel</a>' +
+      (owner && p.id ? '<button type="button" class="link-btn pf-delete" id="pf-delete">Delete profile</button>' : "") +
+      '<p class="form-msg" id="pf-msg" role="status" aria-live="polite"></p>' +
+      "</div>" +
+      "</form>"
+    );
+  }
+
+  /* Wire up the form; save(data) returns a promise for the saved name. */
+  function wireProfileForm(save, del) {
+    var form = document.getElementById("profile-form");
+    var msg = document.getElementById("pf-msg");
+    var file = document.getElementById("pf-file");
+    var remove = document.getElementById("pf-remove");
+    var preview = document.getElementById("pf-preview");
+    function say(text, kind) {
+      msg.textContent = text || "";
+      msg.className = "form-msg" + (kind ? " is-" + kind : "");
+    }
+    function showPhoto(src) {
+      form.elements.photo.value = src || "";
+      preview.innerHTML = cookAvatar(form.elements.name.value || "?", { photo: src }, "cp-photo");
+      remove.hidden = !src;
+    }
+    file.addEventListener("change", function () {
+      if (!file.files || !file.files[0]) return;
+      say("Preparing the photo…");
+      shrinkPhoto(file.files[0])
+        .then(function (data) {
+          showPhoto(data);
+          say("Photo ready. Click Save profile to keep it.");
+        })
+        .catch(function (err) {
+          say(err.message, "error");
+        });
+      file.value = "";
+    });
+    remove.addEventListener("click", function () {
+      showPhoto("");
+      say("Photo removed. Click Save profile to keep the change.");
+    });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var el = form.elements;
+      var data = {
+        name: el.name.value.trim(),
+        photo: el.photo.value,
+        relation: el.relation.value.trim(),
+        hometown: el.hometown.value.trim(),
+        specialty: el.specialty.value.trim(),
+        bio: el.bio.value.trim(),
+        birthday_month: el.birthday_month.value,
+        birthday_day: el.birthday_day.value,
+        phone: el.phone.value.trim(),
+        email: el.email.value.trim()
+      };
+      if (el.unlink && el.unlink.checked) data.unlink = true;
+      if (!data.name) {
+        say("Enter a name.", "error");
+        el.name.focus();
+        return;
+      }
+      if (!data.birthday_month !== !data.birthday_day) {
+        say(PROFILE_ERRORS.invalid_birthday, "error");
+        return;
+      }
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      say("Saving…");
+      save(data)
+        .then(function (savedName) {
+          return Promise.all([loadProfiles(), loadContributors(), loadFamilyDetails()]).then(function () {
+            rebuild();
+            location.hash = cookHref(savedName);
+          });
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          say(err.message, "error");
+        });
+    });
+    // Two clicks to delete, so there's no pop-up to confirm.
+    var delBtn = document.getElementById("pf-delete");
+    if (delBtn && del) {
+      var armed = false;
+      var timer = null;
+      delBtn.addEventListener("click", function () {
+        if (!armed) {
+          armed = true;
+          delBtn.textContent = "Click again to delete this profile";
+          delBtn.classList.add("is-armed");
+          timer = setTimeout(function () {
+            armed = false;
+            delBtn.textContent = "Delete profile";
+            delBtn.classList.remove("is-armed");
+          }, 5000);
+          return;
+        }
+        clearTimeout(timer);
+        delBtn.disabled = true;
+        say("Deleting…");
+        del()
+          .then(function () {
+            return loadProfiles().then(function () {
+              rebuild();
+              location.hash = "#/profiles";
+            });
+          })
+          .catch(function (err) {
+            delBtn.disabled = false;
+            say(err.message, "error");
+          });
+      });
+    }
+  }
+
+  /* ---------- My profile (any signed-in contributor) ---------- */
+
+  function renderMyProfile() {
+    document.title = "My profile · The Dark Sparrow Eats";
+    if (needSignIn("#/me", "Sign in to set up or change your cook profile.")) return;
+    var welcome = /(^|[?&])welcome=1/.test(location.hash) || renderMyProfile._welcome;
+    renderMyProfile._welcome = false;
+    app.innerHTML = '<p class="loading">Opening your profile…</p>';
+    profileRpc("/rpc/my_profile")
+      .then(function (res) {
+        if (current.name !== "me") return;
+        var p = res.profile || null;
+        var f = p ? { birthday_month: p.birthday_month, birthday_day: p.birthday_day, phone: p.phone, email: p.email } : { email: res.account_email || "" };
+        app.innerHTML =
+          '<a class="back" href="#/cooks">' + backArrow() + "All cooks</a>" +
+          '<section class="profile-edit">' +
+          '<h1 class="add-title">' + (p ? "My profile" : "Set up your profile") + "</h1>" +
+          (welcome || !p
+            ? '<p class="add-sub">' + (p ? "Welcome! Art started a profile for you. Check it, add anything you like, and save." : "Tell the family a little about yourself. Your name is how your recipes are credited.") + "</p>"
+            : '<p class="add-sub">Change anything and click Save profile. <a href="' + esc(cookHref(p.name)) + '">See your profile page</a></p>') +
+          profileFormHtml(p, f, "self") +
+          "</section>";
+        wireProfileForm(function (data) {
+          return profileRpc("/rpc/save_my_profile", { p: data }).then(function () {
+            return data.name;
+          });
+        });
+      })
+      .catch(function (err) {
+        if (current.name !== "me") return;
+        app.innerHTML = emptyBlock("Your profile didn’t open", esc(err.message));
+      });
+  }
+
+  /* ---------- Managing everyone's profiles (site owner) ---------- */
+
+  function renderProfilesAdmin() {
+    document.title = "Cook profiles · The Dark Sparrow Eats";
+    if (needSignIn("#/profiles", "Sign in to manage cook profiles.")) return;
+    if (!allLoaded) {
+      app.innerHTML = '<p class="loading">Opening profiles…</p>';
+      return;
+    }
+    var back = '<a class="back" href="#/cooks">' + backArrow() + "All cooks</a>";
+    if (!ownerMode()) {
+      app.innerHTML = back + emptyBlock("Only the site owner can manage profiles", 'You can change your own on <a href="#/me">My profile</a>.');
+      return;
+    }
+    var names = Object.keys(profilesByName).map(function (k) { return profilesByName[k]; }).sort(function (a, b) {
+      return str(a.name).localeCompare(str(b.name));
+    });
+    var credited = cookStats().cooks.filter(function (c) { return !c.profile; });
+    app.innerHTML =
+      back +
+      '<section class="profiles-admin">' +
+      '<h1 class="add-title">Cook profiles</h1>' +
+      '<p class="add-sub">Create a profile for anyone, with or without a site account. Put their email on it and invite that email: their account links to the profile when they accept, and they can change it from then on.</p>' +
+      '<p><a class="btn" href="#/profiles/new">New profile</a></p>' +
+      (names.length
+        ? '<ul class="pa-list">' + names.map(function (p) {
+            var f = familyById[p.id] || {};
+            return (
+              '<li class="pa-row">' + cookAvatar(p.name, p, "pa-photo") +
+              '<div class="pa-id"><a href="' + esc(cookHref(p.name)) + '"><strong>' + esc(p.name) + "</strong></a>" +
+              '<span class="muted">' + esc([str(p.relation), f.linked_account ? "account: " + f.linked_account : f.email ? "not linked yet (" + f.email + ")" : "no account"].filter(Boolean).join(" · ")) + "</span></div>" +
+              '<a class="btn btn-quiet btn-small" href="#/profiles/edit/' + esc(p.id) + '">Edit</a></li>'
+            );
+          }).join("") + "</ul>"
+        : emptyBlock("No profiles yet", "Click <strong>New profile</strong> to make the first one.")) +
+      (credited.length
+        ? '<h2 class="pa-sub">Cooks without a profile</h2><ul class="pa-list">' + credited.map(function (c) {
+            return '<li class="pa-row">' + cookAvatar(c.name, null, "pa-photo") +
+              '<div class="pa-id"><strong>' + esc(c.name) + '</strong><span class="muted">' + c.count + (c.count === 1 ? " recipe" : " recipes") + "</span></div>" +
+              '<a class="btn btn-quiet btn-small" href="#/profiles/new/' + esc(encodeURIComponent(c.name)) + '">Create profile</a></li>';
+          }).join("") + "</ul>"
+        : "") +
+      "</section>";
+  }
+
+  function renderOwnerProfileForm(isNew, idOrName) {
+    document.title = (isNew ? "New profile" : "Edit profile") + " · The Dark Sparrow Eats";
+    if (needSignIn(location.hash, "Sign in to manage cook profiles.")) return;
+    if (!allLoaded) {
+      app.innerHTML = '<p class="loading">Opening the profile…</p>';
+      return;
+    }
+    var back = '<a class="back" href="#/profiles">' + backArrow() + "All profiles</a>";
+    if (!ownerMode()) {
+      app.innerHTML = back + emptyBlock("Only the site owner can do this", 'You can change your own profile on <a href="#/me">My profile</a>.');
+      return;
+    }
+    var p = null;
+    if (!isNew) {
+      Object.keys(profilesByName).forEach(function (k) {
+        if (profilesByName[k].id === idOrName) p = profilesByName[k];
+      });
+      if (!p) {
+        app.innerHTML = back + emptyBlock("That profile isn’t here", "It may have been deleted.");
+        return;
+      }
+    } else {
+      p = { name: str(idOrName) };
+    }
+    var f = (p.id && familyById[p.id]) || {};
+    app.innerHTML =
+      back +
+      '<section class="profile-edit">' +
+      '<h1 class="add-title">' + (isNew ? "New profile" : "Edit " + esc(p.name)) + "</h1>" +
+      profileFormHtml(p, f, "owner") +
+      "</section>";
+    wireProfileForm(
+      function (data) {
+        return profileRpc("/rpc/owner_save_profile", { p_id: p.id || null, p: data }).then(function () {
+          return data.name;
+        });
+      },
+      p.id
+        ? function () {
+            return profileRpc("/rpc/owner_delete_profile", { p_id: p.id });
+          }
+        : null
     );
   }
 
@@ -2077,6 +2710,12 @@
     if (/^\/?family\/?$/.test(hash)) return { name: "family" };
     if (/^\/?categories\/?$/.test(hash)) return { name: "categories" };
     if (/^\/?cooks\/?$/.test(hash)) return { name: "cooks" };
+    if (/^\/?me(\?.*)?$/.test(hash)) return { name: "me" };
+    if (/^\/?profiles\/?$/.test(hash)) return { name: "profiles" };
+    var cookM = hash.match(/^\/?cook\/(.+?)\/?$/);
+    if (cookM) return { name: "cook", id: cookM[1] };
+    var pe = hash.match(/^\/?profiles\/(edit|new)(?:\/(.+?))?\/?$/);
+    if (pe) return { name: "profile-" + pe[1], id: pe[2] || "" };
     var si = hash.match(/^\/?signin(?:\/(plan|shopping))?\/?$/);
     if (si) return { name: "signin", next: si[1] || "" };
     var plan = hash.match(/^\/?(plan|shopping)(?:\/(\d{4}-\d{2}-\d{2}))?\/?$/);
@@ -2092,7 +2731,7 @@
   function markNav() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-nav]"), function (a) {
       var nav = a.getAttribute("data-nav");
-      var on = nav === current.name || (nav === "plan" && current.name === "shopping");
+      var on = nav === current.name || (nav === "plan" && current.name === "shopping") || (nav === "cooks" && current.name === "cook");
       if (on) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     });
@@ -2109,6 +2748,10 @@
     else if (current.name === "family") renderFamily();
     else if (current.name === "categories") renderCategories();
     else if (current.name === "cooks") renderCooks();
+    else if (current.name === "cook") renderCookProfile(current.id);
+    else if (current.name === "me") renderMyProfile();
+    else if (current.name === "profiles") renderProfilesAdmin();
+    else if (current.name === "profile-edit" || current.name === "profile-new") renderOwnerProfileForm(current.name === "profile-new", current.id);
     else if (current.name === "edit") renderEdit(current.id);
     else if (current.name === "plan" || current.name === "shopping") renderPlanner(current.name, current.week);
     else if (current.name === "signin") {
@@ -2156,7 +2799,9 @@
       var now = signedIn();
       if (now === wasSignedIn) return;
       wasSignedIn = now;
-      loadHiddenSaved().then(loadContributorDetails).then(function () {
+      loadHiddenSaved().then(function () {
+        return Promise.all([loadContributorDetails(), loadFamilyDetails()]);
+      }).then(function () {
         rebuild();
         if (current.name === "list") {
           paintTabs();
@@ -2167,6 +2812,8 @@
           renderCategories();
         } else if (current.name === "cooks") {
           renderCooks();
+        } else if (/^(cook|me|profiles|profile-edit|profile-new)$/.test(current.name)) {
+          route();
         }
       });
     });
@@ -2184,6 +2831,10 @@
       renderEdit(current.id);
     } else if (current.name === "cooks") {
       renderCooks();
+    } else if (current.name === "cook") {
+      renderCookProfile(current.id);
+    } else if (/^(me|profiles|profile-edit|profile-new)$/.test(current.name) && app.querySelector(".loading")) {
+      route();
     } else if ((current.name === "add" || current.name === "categories") && app.querySelector(".loading")) {
       if (current.name === "add") renderAdd();
       else renderCategories();

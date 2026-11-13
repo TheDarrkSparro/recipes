@@ -410,7 +410,9 @@
         .then(function () {
           form.innerHTML =
             '<p class="form-msg is-ok">Password saved. You’re signed in on this device.</p>' +
-            '<div class="auth-row"><a class="btn" href="#/add">Add a recipe</a><a class="link-btn" href="/guide/">Read the guide</a></div>';
+            (welcome
+              ? '<div class="auth-row"><a class="btn" href="#/me?welcome=1">Set up your profile</a><a class="link-btn" href="#/add">Add a recipe</a><a class="link-btn" href="/guide/">Read the guide</a></div>'
+              : '<div class="auth-row"><a class="btn" href="#/add">Add a recipe</a><a class="link-btn" href="#/me">My profile</a><a class="link-btn" href="/guide/">Read the guide</a></div>');
         })
         .catch(function (err) {
           busy(btn, false, "Save password");
@@ -427,10 +429,11 @@
     if (session) {
       el.innerHTML =
         "Signed in as " + esc(session.email || "a contributor") +
+        ' · <a href="#/me">My profile</a>' +
         ' · <button type="button" class="link-btn" id="sign-out">Sign out</button>';
       el.querySelector("#sign-out").addEventListener("click", function () {
         signOut();
-        if (/^#\/(add|edit\/)/.test(location.hash)) location.hash = "#/";
+        if (/^#\/(add|edit\/|me|profiles)/.test(location.hash)) location.hash = "#/";
       });
     } else {
       el.innerHTML = '<a href="#/signin">Contributor sign in</a>';

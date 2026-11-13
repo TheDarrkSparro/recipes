@@ -127,6 +127,25 @@ Each recipe can show **Contributed by …** under its title, for example "Contri
 
 Hidden recipes are left out. Search on the home page also finds recipes by cook name. The owner also sees, at the bottom, which site **accounts** added recipes and when. The 12 recipes moved from `recipes.js` don't have a real "added" date, so they don't count toward Newest addition.
 
+## Cook profiles
+
+Every cook can have a profile page (`#/cook/<name>`), reached from their name on the **Our cooks** page or from **Contributed by** on a recipe. A profile belongs to a cook's name, so it works for people with or without a site account.
+
+- **Public (anyone):** photo, name, relation (e.g. "Art's sister"), hometown, specialty, and an **About** section.
+- **Family only (signed-in contributors):** birthday (month and day), phone and email. Visitors see a note to sign in instead. Signed-in family also see **Birthdays coming up** (next 30 days) on the cooks page.
+- The page also shows the cook's stats and all their recipes.
+
+**Who can change a profile**
+
+- **The owner** manages every profile at **Cooks → Manage profiles** (`#/profiles`): create one for anyone (including people who will never sign in), edit, unlink an account, or delete. Each cook credited on a recipe without a profile has a **Create profile** button there.
+- **Contributors** change their own at **My profile** (footer link, or `#/me`). If they don't have one yet, they can create it; they can't use a name another profile already has, or a name recipes are already credited to.
+
+**Invites and profiles:** put the person's email on their profile, then invite that same email from Supabase. When they accept the invite and choose a password, the **Set up your profile** button takes them to their profile, already filled in, and it's linked to their account from then on. If the account already exists, saving the profile links it right away. Unlinking only sticks if you also change the email on the profile.
+
+Renaming a profile also renames that cook's **Contributed by** credits. Photos are shrunk in the browser (to about 480 pixels) and stored with the profile, so no extra storage setup is needed. Deleting a profile keeps the cook's recipe credits.
+
+**One-time setup:** after `add-contributors.sql`, open Supabase **SQL Editor**, paste `supabase/add-profiles.sql`, and click **Run**. It adds `public.cook_profiles` (public columns readable by anyone; birthday, phone, email and the linked account readable only through `family_profile_details()`, which requires a contributor sign-in) and the functions `my_profile()`, `save_my_profile()`, `owner_save_profile()` and `owner_delete_profile()`.
+
 ## Keep screen on
 
 Every recipe page has a **Keep screen on** switch next to **Print**, so a phone or tablet doesn't dim or lock while someone cooks. Once switched on, it stays on for other recipes opened in the same tab, and turns itself off when leaving recipe pages. It uses the browser's Screen Wake Lock feature, which works in current Chrome, Edge, Safari (iPhone and iPad with iOS 16.4 or later) and Firefox. On browsers without it, the switch doesn't appear. Battery saver mode can stop it from working; the page says so if that happens.
