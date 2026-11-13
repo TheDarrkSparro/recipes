@@ -97,6 +97,7 @@
     allRecipes = merged.concat(extra);
     allRecipes.forEach(function (r) {
       var id = recipeId(r);
+      r._contributor = (id && contribNames[id]) || "";
       r._hiddenInFile = r.hidden === true && !r._saved;
       r._hidden = r._hiddenInFile || !!(id && hiddenIds[id]);
     });
@@ -248,6 +249,92 @@
     });
   }
 
+  /* ---------- Contributors (supabase/add-contributors.sql) ----------
+     contribNames: the public "Contributed by" name for each recipe id.
+     contribDetails: for the owner only, who added each recipe and when. */
+  var contribNames = Object.create(null);
+  var contribDetails = Object.create(null);
+
+  function loadContributors() {
+    return window.Reviews.api("/recipe_contributors?select=id,contributor&limit=2000")
+      .then(function (rows) {
+        var next = Object.create(null);
+        (Array.isArray(rows) ? rows : []).forEach(function (r) {
+          if (r && r.id && str(r.contributor)) next[r.id] = str(r.contributor);
+        });
+        contribNames = next;
+      })
+      .catch(function () {
+        /* Not set up yet, or offline: no names shown. */
+      });
+  }
+
+  function loadContributorDetails() {
+    contribDetails = Object.create(null);
+    if (!ownerMode()) return Promise.resolve();
+    return window.Auth.token()
+      .then(function (token) {
+        if (!token) return null;
+        return window.Reviews.api("/rpc/owner_contributor_details", { method: "POST", token: token, body: {} });
+      })
+      .then(function (res) {
+        if (!res || !res.ok || !Array.isArray(res.rows)) return;
+        res.rows.forEach(function (r) {
+          if (!r || !r.id) return;
+          contribDetails[r.id] = { addedBy: str(r.added_by), addedAt: str(r.added_at) };
+          // Includes hidden recipes, which the public list leaves out.
+          if (str(r.contributor)) contribNames[r.id] = str(r.contributor);
+        });
+      })
+      .catch(function () {
+        /* Not set up yet: nothing extra to show. */
+      });
+  }
+
+  /* Save a "Contributed by" name (owner only). Resolves, or rejects with an
+     Error whose .key is one of CONTRIB_ERRORS. */
+  var CONTRIB_ERRORS = {
+    not_signed_in: "Your sign-in has ended. Sign in again, then save.",
+    not_contributor: "This account can’t change contributors.",
+    not_owner: "Only the site owner can change who contributed a recipe.",
+    invalid_input: "Use a plain name of 80 characters or fewer, without web links.",
+    not_set_up: "Contributors aren’t switched on yet. In Supabase, run supabase/add-contributors.sql (see README.md).",
+    network: "Couldn’t reach the recipe database. Check your connection and try again.",
+    failed: "That didn’t save. Refresh the page and try again."
+  };
+
+  function saveContributor(id, name) {
+    name = String(name || "").trim();
+    return window.Auth.token()
+      .then(function (token) {
+        if (!token) {
+          var e = new Error("not_signed_in");
+          e.key = "not_signed_in";
+          throw e;
+        }
+        return window.Reviews.api("/rpc/owner_set_contributor", { method: "POST", token: token, body: { p_id: id, p_name: name } });
+      })
+      .then(function (res) {
+        if (!res || !res.ok) {
+          var e = new Error((res && res.error) || "failed");
+          e.key = (res && res.error) || "failed";
+          throw e;
+        }
+        if (name) contribNames[id] = name;
+        else delete contribNames[id];
+        rebuild();
+      })
+      .catch(function (err) {
+        var key = (err && err.key) || "";
+        if (!key && err && err.kind === "network") key = "network";
+        if (!key && err && err.kind === "server" && (err.status === 404 || err.code === "PGRST202")) key = "not_set_up";
+        if (!key && err && err.kind === "server" && (err.status === 401 || err.status === 403)) key = "not_signed_in";
+        var out = new Error(CONTRIB_ERRORS[key] || CONTRIB_ERRORS.failed);
+        out.key = key || "failed";
+        throw out;
+      });
+  }
+
   function loadSaved() {
     allLoaded = false;
     if (!window.Reviews || !window.Reviews.enabled || !window.Reviews.api) {
@@ -255,7 +342,10 @@
       allLoaded = true;
       return Promise.resolve();
     }
-    var extras = Promise.all([loadHiddenIds(), loadHiddenSaved(), loadCategories()]);
+    var extras = Promise.all([loadHiddenIds(), loadHiddenSaved(), loadCategories(), loadContributors()]).then(function () {
+      // The owner check happens in loadHiddenSaved, so this goes after it.
+      return loadContributorDetails();
+    });
     var rows = window.Reviews.api(
       "/recipes?select=id,title,category,tags,time_minutes,servings,image,ingredients,steps,notes,source_url,created_at&order=created_at.desc&limit=500"
     )
@@ -759,6 +849,7 @@
       '<header class="recipe-head">' +
       '<p class="recipe-cat"><span class="card-tab">' + esc(cat) + "</span></p>" +
       '<h1 class="recipe-title" tabindex="-1">' + esc(title) + "</h1>" +
+      contributorHtml(recipe, rid) +
       (tags.length
         ? '<ul class="tags" aria-label="Tags">' + tags.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>"
         : "") +
@@ -886,6 +977,8 @@
       }
     });
 
+    wireContributor(rid);
+
     var wakeToggle = document.getElementById("wake-toggle");
     if (wakeToggle) {
       wakeToggle.addEventListener("change", function () {
@@ -989,6 +1082,102 @@
         button.disabled = false;
         say(VISIBILITY_ERRORS[key] || VISIBILITY_ERRORS.failed);
       });
+  }
+
+  /* ---------- "Contributed by" on the recipe page ---------- */
+
+  function contributorHtml(recipe, rid) {
+    var name = recipe._contributor;
+    var owner = ownerMode() && rid;
+    if (!name && !owner) return "";
+    var detail = owner ? contribDetails[rid] : null;
+    var added = "";
+    if (detail && detail.addedBy) {
+      var when = detail.addedAt ? new Date(detail.addedAt) : null;
+      added =
+        '<span class="contrib-added">Added by ' + esc(detail.addedBy) +
+        (when && !isNaN(when) ? " on " + esc(when.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })) : "") +
+        " · only you see this</span>";
+    }
+    return (
+      '<div class="contrib" id="contrib">' +
+      (name
+        ? '<p class="contrib-line">Contributed by <strong>' + esc(name) + "</strong></p>"
+        : '<p class="contrib-line contrib-empty">No contributor set</p>') +
+      (owner
+        ? '<button type="button" class="link-btn contrib-edit" id="contrib-edit">' + (name ? "Change" : "Add contributor") + "</button>"
+        : "") +
+      added +
+      (owner
+        ? '<form class="contrib-form" id="contrib-form" hidden>' +
+          '<label class="sr-only" for="contrib-input">Contributed by</label>' +
+          '<input id="contrib-input" maxlength="80" autocomplete="off" placeholder="e.g. Grandma Garro" value="' + esc(name) + '">' +
+          '<button type="submit" class="btn btn-small">Save</button>' +
+          '<button type="button" class="link-btn" id="contrib-cancel">Cancel</button>' +
+          '<p class="form-msg" id="contrib-msg" role="status" aria-live="polite"></p>' +
+          "</form>"
+        : "") +
+      "</div>"
+    );
+  }
+
+  /* Contributor names arrive after the page is drawn; update just that line. */
+  function repaintContributor() {
+    var r = shownRecipe;
+    var title = app.querySelector(".recipe-title");
+    if (!r || !title) return;
+    var old = document.getElementById("contrib");
+    if (old) old.remove();
+    title.insertAdjacentHTML("afterend", contributorHtml(r, recipeId(r)));
+    wireContributor(recipeId(r));
+  }
+
+  /* A contributor name that didn't save with the recipe, shown once on the
+     recipe page so it can be tried again there. */
+  var pendingContribMsg = "";
+
+  function wireContributor(rid) {
+    var edit = document.getElementById("contrib-edit");
+    var form = document.getElementById("contrib-form");
+    var pending = pendingContribMsg;
+    pendingContribMsg = "";
+    if (!edit || !form) return;
+    var input = document.getElementById("contrib-input");
+    var msg = document.getElementById("contrib-msg");
+    edit.addEventListener("click", function () {
+      form.hidden = false;
+      edit.hidden = true;
+      input.focus();
+      input.select();
+    });
+    document.getElementById("contrib-cancel").addEventListener("click", function () {
+      form.hidden = true;
+      edit.hidden = false;
+      input.value = contribNames[rid] || "";
+      msg.textContent = "";
+    });
+    if (pending) {
+      form.hidden = false;
+      edit.hidden = true;
+      msg.className = "form-msg is-error";
+      msg.textContent = "The recipe saved, but not the contributor name: " + pending;
+    }
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      msg.className = "form-msg";
+      msg.textContent = "Saving…";
+      saveContributor(rid, input.value)
+        .then(function () {
+          renderDetail(rid);
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          msg.className = "form-msg is-error";
+          msg.textContent = err.message;
+        });
+    });
   }
 
   /* ---------- Keep screen on while cooking (Screen Wake Lock) ----------
@@ -1153,8 +1342,11 @@
     window.AddRecipe.mount(app, {
       categories: categoryChoices(),
       canEditCategories: ownerMode(),
+      canSetContributor: ownerMode(),
+      saveContributor: saveContributor,
       takenIds: allRecipes.map(recipeId),
-      onSaved: function (recipe) {
+      onSaved: function (recipe, contribProblem) {
+        pendingContribMsg = contribProblem || "";
         saved.unshift(recipe);
         rebuild();
         location.hash = "#/recipe/" + encodeURIComponent(recipe.id);
@@ -1190,10 +1382,13 @@
     window.AddRecipe.mount(app, {
       categories: categoryChoices(),
       canEditCategories: ownerMode(),
+      canSetContributor: ownerMode(),
+      saveContributor: saveContributor,
       edit: {
         id: recipeId(recipe),
         title: titleOf(recipe),
         category: canonicalCategory(recipe.category),
+        contributor: recipe._contributor || "",
         tags: stringList(recipe.tags),
         timeMinutes: Number(recipe.timeMinutes) > 0 ? Number(recipe.timeMinutes) : "",
         servings: recipe.servings == null ? "" : String(recipe.servings),
@@ -1204,7 +1399,8 @@
         source: safeLink(recipe.source) || "",
         _added: recipe._builtIn ? "" : recipe._added || ""
       },
-      onSaved: function (updated) {
+      onSaved: function (updated, contribProblem) {
+        pendingContribMsg = contribProblem || "";
         saved = saved.filter(function (r) {
           return r.id !== updated.id;
         });
@@ -1615,7 +1811,7 @@
       var now = signedIn();
       if (now === wasSignedIn) return;
       wasSignedIn = now;
-      loadHiddenSaved().then(function () {
+      loadHiddenSaved().then(loadContributorDetails).then(function () {
         rebuild();
         if (current.name === "list") {
           paintTabs();
@@ -1636,6 +1832,7 @@
     } else if (current.name === "detail") {
       // Re-draw in case this recipe has an edited version.
       if (!app.querySelector(".recipe") || findRecipe(current.id) !== shownRecipe) renderDetail(current.id);
+      else repaintContributor();
     } else if (current.name === "edit") {
       renderEdit(current.id);
     } else if ((current.name === "add" || current.name === "categories") && app.querySelector(".loading")) {
