@@ -138,6 +138,17 @@ If some recipes use a category that isn't in the list (for example an old one in
 
 How it works: `public.recipe_categories` holds the list (name, order, and old names in `also_matches`); anyone can read it. `owner_save_categories()` saves the whole list and checks in the database that the caller is the owner. A database check (`recipes_category_check`) refuses any recipe saved with a category that isn't in the list; edits that keep a recipe's existing category are still allowed.
 
+## Contributors
+
+Each recipe can show **Contributed by …** under its title, for example "Contributed by Grandma Garro". Only the site owner can set or change that name; everyone sees it.
+
+- **On a recipe page:** sign in as the owner and click **Add contributor** (or **Change**) under the title, type the name, and click **Save**. Leave it empty and save to remove it.
+- **On the add/edit form:** the owner also gets a **Contributed by** field. Other contributors don't see it.
+- **Who added it:** the site also records, automatically, which account added each recipe. Only the owner sees that, as a small "Added by …" line under the name. Recipes added before this was set up have none. For a recipe from `recipes.js`, it's the account that first edited it on the site.
+- Hidden recipes' names stay private, like the recipes themselves.
+
+**One-time setup:** after `add-recipe-hiding.sql`, open Supabase **SQL Editor**, paste `supabase/add-contributors.sql`, and click **Run**. It adds `public.recipe_contributors` (the names, readable by anyone; "added by" readable only through the owner-only `owner_contributor_details()`), `owner_set_contributor()`, and a database trigger that records who added each new recipe.
+
 ## Keep screen on
 
 Every recipe page has a **Keep screen on** switch next to **Print**, so a phone or tablet doesn't dim or lock while someone cooks. Once switched on, it stays on for other recipes opened in the same tab, and turns itself off when leaving recipe pages. It uses the browser's Screen Wake Lock feature, which works in current Chrome, Edge, Safari (iPhone and iPad with iOS 16.4 or later) and Firefox. On browsers without it, the switch doesn't appear. Battery saver mode can stop it from working; the page says so if that happens.

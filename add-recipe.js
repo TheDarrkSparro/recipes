@@ -189,6 +189,12 @@
       field("Method", '<textarea name="steps" rows="10"></textarea>', "wide",
         "Steps copied from another site are that cook’s own words. It’s good practice to rewrite them in yours; the source is credited on the recipe page either way.") +
       field("Cook’s notes", '<textarea name="notes" rows="3" maxlength="4000"></textarea>', "wide") +
+      (ctx.canSetContributor
+        ? field("Contributed by",
+            '<input name="contributor" maxlength="80" autocomplete="off" placeholder="e.g. Grandma Garro" value="' + esc((ctx.edit && ctx.edit.contributor) || "") + '">',
+            "wide",
+            "Shown on the recipe page. Only you can see and change this field.")
+        : "") +
       field("Source", '<input name="source" type="url" placeholder="https://" maxlength="1000">', "wide",
         "Where the recipe came from. Shown as “Adapted from” on the recipe page.") +
       "</div>" +
@@ -416,8 +422,24 @@
           recipe.id = data.id || recipe.id;
           recipe._saved = true;
           recipe._added = editing ? editing._added || "" : new Date().toISOString();
+          // The owner's "Contributed by" name is saved separately, only when it changed.
+          var contribInput = form.elements.contributor;
+          var contribName = contribInput ? contribInput.value.trim() : "";
+          var contribWas = (editing && editing.contributor) || "";
+          if (!contribInput || !ctx.saveContributor || contribName === contribWas) return null;
+          return ctx.saveContributor(recipe.id, contribName).then(
+            function () {
+              return null;
+            },
+            function (err) {
+              return err.message || "The contributor name didn’t save.";
+            }
+          );
+        })
+        .then(function (contribProblem) {
+          if (contribProblem === undefined) return;
           setMsg(saveMsg, editing ? "Changes saved." : "Saved.", "ok");
-          if (ctx.onSaved) ctx.onSaved(recipe);
+          if (ctx.onSaved) ctx.onSaved(recipe, contribProblem || "");
         })
         .catch(function (err) {
           var key = err && err.kind === "network" ? "network" : (err && err.message) || "";
