@@ -856,6 +856,7 @@
 
     app.innerHTML =
       '<article class="recipe hue-' + hue(cat) + '">' +
+      printBrandHtml() +
       '<a class="back" href="#/">' + backArrow() + "All recipes</a>" +
       hiddenNote +
       '<header class="recipe-head">' +
@@ -926,6 +927,7 @@
         : "") +
       "</section>" +
       "</div>" +
+      printExtrasHtml(rid, title) +
       '<p class="owner-edit"><a href="#/edit/' + esc(encodeURIComponent(rid)) + '">Edit this recipe</a> (contributors only)</p>' +
       '<section class="reviews" id="reviews"></section>' +
       "</article>";
@@ -1096,6 +1098,60 @@
       });
   }
 
+  /* ---------- Printed recipe extras (shown only when printing) ---------- */
+
+  var SPARROW_SVG =
+    '<svg class="print-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">' +
+    '<path fill="currentColor" d="M10 29.5c2.2-5.6 7-9.3 13.2-9.6 1.4-3.4 4.4-5.4 7.8-5.1 1.6.1 2.9.8 3.8 1.8l4.2.6-3.4 2.1c.3 3.7-1.4 7-4.6 9.1l7.5 6.1-9.6-2.5c-2.6 1.4-5.7 1.9-8.9 1.4-3.4-.5-6.5-2-8.9-3.9h-1.1z"></path>' +
+    "</svg>";
+
+  function printBrandHtml() {
+    return (
+      '<div class="print-only print-brand" aria-hidden="true">' +
+      SPARROW_SVG +
+      '<span class="print-brand-name">The Dark Sparrow Eats</span>' +
+      '<span class="print-brand-tag">Home cooking, written down to cook from</span>' +
+      "</div>"
+    );
+  }
+
+  function recipeUrl(rid) {
+    return location.origin + location.pathname + "#/recipe/" + encodeURIComponent(rid);
+  }
+
+  /* An SVG QR code that opens this recipe, or "" if the library is missing. */
+  function qrSvg(text) {
+    if (typeof window.qrcode !== "function") return "";
+    try {
+      var qr = window.qrcode(0, "M");
+      qr.addData(text);
+      qr.make();
+      return qr.createSvgTag({ cellSize: 2, margin: 0, scalable: true, alt: "QR code for this recipe" });
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function printExtrasHtml(rid, title) {
+    var url = recipeUrl(rid);
+    var qr = qrSvg(url);
+    var today = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    return (
+      '<div class="print-only print-end" aria-hidden="true">' +
+      '<section class="print-mynotes">' +
+      "<h2>My notes</h2>" +
+      '<div class="print-lines"><span></span><span></span><span></span><span></span></div>' +
+      "</section>" +
+      '<div class="print-qrbox">' +
+      (qr ? '<div class="print-qr">' + qr + "</div>" : "") +
+      "<strong>" + (qr ? "Scan to open this recipe on your phone" : "Find this recipe on your phone") + "</strong>" +
+      '<span class="print-url">' + esc(url.replace(/^https?:\/\//, "")) + "</span>" +
+      "</div>" +
+      "</div>" +
+      '<p class="print-only print-foot" aria-hidden="true">Printed ' + esc(today) + " from The Dark Sparrow Eats · ¡Buen provecho!</p>"
+    );
+  }
+
   /* ---------- "Contributed by" on the recipe page ---------- */
 
   function contributorHtml(recipe, rid) {
@@ -1114,7 +1170,8 @@
     return (
       '<div class="contrib" id="contrib">' +
       (name
-        ? '<p class="contrib-line">Contributed by <strong>' + esc(name) + "</strong></p>"
+        ? '<p class="contrib-line">Contributed by <strong>' + esc(name) + "</strong></p>" +
+          '<p class="print-only print-kitchen">From the kitchen of <strong>' + esc(name) + "</strong></p>"
         : '<p class="contrib-line contrib-empty">No contributor set</p>') +
       (owner
         ? '<button type="button" class="link-btn contrib-edit" id="contrib-edit">' + (name ? "Change" : "Add contributor") + "</button>"
