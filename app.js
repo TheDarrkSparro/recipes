@@ -23,6 +23,9 @@
      signed-in contributors can load. */
   var hiddenIds = Object.create(null);
   var hiddenSaved = [];
+  /* Only the site owner (set in supabase/add-recipe-hiding.sql) sees hidden
+     recipes and can hide or show them. Checked with Supabase after sign-in. */
+  var isOwner = false;
   var allRecipes = local.slice();
   var recipes = local.filter(function (r) {
     return r.hidden !== true;
@@ -97,13 +100,17 @@
       r._hiddenInFile = r.hidden === true && !r._saved;
       r._hidden = r._hiddenInFile || !!(id && hiddenIds[id]);
     });
-    // Contributors still see hidden recipes (marked Hidden) so they can check
-    // and un-hide them; everyone else never gets them.
-    recipes = signedIn()
+    // The site owner still sees hidden recipes, under the Hidden category, so
+    // they can check and un-hide them; nobody else gets them.
+    recipes = ownerMode()
       ? allRecipes
       : allRecipes.filter(function (r) {
           return !r._hidden;
         });
+  }
+
+  function ownerMode() {
+    return isOwner && signedIn();
   }
 
   /* Signed in as a contributor (see auth.js). */
@@ -138,16 +145,25 @@
       });
   }
 
-  /* Hidden recipes that were added on the site, for signed-in contributors. */
+  /* Whether the signed-in account is the site owner, then (for the owner only)
+     the hidden recipes that were added on the site. */
   function loadHiddenSaved() {
-    if (!signedIn() || !window.Auth.token) {
+    if (!signedIn() || !window.Auth.token || !window.Reviews || !window.Reviews.api) {
+      isOwner = false;
       hiddenSaved = [];
       return Promise.resolve();
     }
+    var token = null;
     return window.Auth.token()
-      .then(function (token) {
-        if (!token) return null;
-        return window.Reviews.api("/rpc/contributor_hidden_recipes", { method: "POST", token: token, body: {} });
+      .then(function (t) {
+        token = t;
+        if (!token) return false;
+        return window.Reviews.api("/rpc/am_i_site_owner", { method: "POST", token: token, body: {} });
+      })
+      .then(function (owner) {
+        isOwner = owner === true;
+        if (!isOwner) return null;
+        return window.Reviews.api("/rpc/owner_hidden_recipes", { method: "POST", token: token, body: {} });
       })
       .then(function (res) {
         hiddenSaved = res && res.ok && Array.isArray(res.recipes)
@@ -157,6 +173,7 @@
           : [];
       })
       .catch(function () {
+        isOwner = false;
         hiddenSaved = [];
       });
   }
@@ -272,7 +289,8 @@
     "Mains": "plum",
     "Sides": "sage",
     "Spice Blends": "olive",
-    "Pickles": "teal"
+    "Pickles": "teal",
+    "Hidden": "hidden"
   };
   function hue(category) {
     if (FIXED[category]) return FIXED[category];
@@ -285,16 +303,18 @@
     var counts = Object.create(null);
     var list = [];
     recipes.forEach(function (recipe) {
-      var c = str(recipe.category) || "Other";
+      var c = categoryOf(recipe);
       if (!counts[c]) {
         counts[c] = 0;
         list.push(c);
       }
       counts[c] += 1;
     });
+    var LAST = { Other: 1, Hidden: 2 };
     list.sort(function (a, b) {
-      if (a === "Other") return 1;
-      if (b === "Other") return -1;
+      var la = LAST[a] || 0;
+      var lb = LAST[b] || 0;
+      if (la !== lb) return la - lb;
       return a.localeCompare(b);
     });
     return list.map(function (name) {
@@ -302,7 +322,11 @@
     });
   }
 
+  /* A hidden recipe is listed under "Hidden" (only the owner sees it). Its own
+     category is kept, so it goes back there when it's shown again. */
+  var HIDDEN_CATEGORY = "Hidden";
   function categoryOf(recipe) {
+    if (recipe._hidden) return HIDDEN_CATEGORY;
     return str(recipe.category) || "Other";
   }
 
@@ -417,7 +441,6 @@
       '<span class="card-tab">' + esc(cat) + "</span>" +
       '<span class="card-face">' +
       (image ? '<span class="card-photo"><img src="' + esc(image) + '" alt="" loading="lazy"></span>' : "") +
-      (recipe._hidden ? '<span class="hidden-mark">' + ICON_EYE_OFF + "Hidden from the public</span>" : "") +
       (top ? '<span class="top-mark"><span aria-hidden="true">★</span> Top rated</span>' : "") +
       '<span class="card-title">' + esc(titleOf(recipe)) + "</span>" +
       '<span class="card-facts">' +
@@ -637,11 +660,11 @@
     if (recipe._hiddenInFile) {
       hiddenNote =
         '<p class="hidden-note">' + ICON_EYE_OFF +
-        "<span><strong>Hidden from the public.</strong> Only signed-in contributors can see this recipe. It is marked <code>hidden: true</code> in <code>recipes.js</code>; remove that line to publish it.</span></p>";
+        "<span><strong>Hidden from the public.</strong> Only you can see this recipe. It is marked <code>hidden: true</code> in <code>recipes.js</code>; remove that line to publish it.</span></p>";
     } else if (recipe._hidden) {
       hiddenNote =
         '<p class="hidden-note">' + ICON_EYE_OFF +
-        "<span><strong>Hidden from the public.</strong> Only signed-in contributors can see this recipe. Click <strong>Show on site</strong> to publish it again.</span></p>";
+        "<span><strong>Hidden from the public.</strong> Only you can see this recipe. Click <strong>Show on site</strong> to publish it again" + (str(recipe.category) ? " under " + esc(str(recipe.category)) : "") + ".</span></p>";
     }
 
     app.innerHTML =
@@ -664,7 +687,7 @@
         ? '<a class="btn btn-quiet" href="#/edit/' + esc(encodeURIComponent(rid)) + '">' +
           '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M12.8 4.2l3 3L7.5 15.5l-3.7.7.7-3.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
           "Edit</a>" +
-          (recipe._hiddenInFile
+          (recipe._hiddenInFile || !ownerMode()
             ? ""
             : '<button type="button" class="btn btn-quiet" data-visibility="' + (recipe._hidden ? "show" : "hide") + '">' +
               (recipe._hidden ? ICON_EYE + "Show on site" : ICON_EYE_OFF + "Hide from site") +
@@ -797,6 +820,7 @@
   var VISIBILITY_ERRORS = {
     not_signed_in: "Your sign-in has ended. Sign in again, then try once more.",
     not_contributor: "This account can’t hide or show recipes.",
+    not_owner: "Only the site owner can hide or show recipes.",
     not_set_up: "Hiding recipes isn’t switched on yet. In Supabase, run supabase/add-recipe-hiding.sql (see README.md).",
     network: "Couldn’t reach the recipe database. Check your connection and try again.",
     failed: "That didn’t save. Refresh the page and try again."
@@ -822,7 +846,7 @@
           e.key = "not_signed_in";
           throw e;
         }
-        return window.Reviews.api("/rpc/contributor_set_recipe_hidden", {
+        return window.Reviews.api("/rpc/owner_set_recipe_hidden", {
           method: "POST",
           token: token,
           body: { p_id: id, p_hidden: hide }
@@ -952,7 +976,7 @@
           return c.name;
         })
         .filter(function (n) {
-          return n !== "Other";
+          return n !== "Other" && n !== HIDDEN_CATEGORY;
         }),
       takenIds: recipes.map(recipeId),
       onSaved: function (recipe) {
@@ -993,7 +1017,7 @@
         return c.name;
       })
       .filter(function (n) {
-        return n !== "Other";
+        return n !== "Other" && n !== HIDDEN_CATEGORY;
       });
     window.AddRecipe.mount(app, {
       categories: cats,

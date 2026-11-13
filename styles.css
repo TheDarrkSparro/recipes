@@ -32,6 +32,7 @@
 .hue-plum  { --hue: #8c1116; }
 .hue-teal  { --hue: #7d5c00; }
 .hue-olive { --hue: #b3121f; }
+.hue-hidden { --hue: #5b6670; }
 
 * { box-sizing: border-box; }
 
@@ -462,19 +463,7 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 }
 .top-mark span { color: var(--saffron); }
 
-/* Hidden recipes (only contributors see them) */
-.hidden-mark {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.1rem 0.55rem;
-  border-radius: 999px;
-  background: #ece8e1;
-  color: var(--slate);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
+/* Hidden recipes (only the site owner sees them) */
 .card.is-hidden .card-face { opacity: 0.72; }
 .card.is-hidden .card-photo img { filter: grayscale(0.7); }
 .hidden-note {

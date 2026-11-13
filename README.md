@@ -54,7 +54,7 @@ The easier way is **Add a recipe** on the site itself (next section); it needs n
 - Use `null` for `timeMinutes` or `servings` when you do not want them shown.
 - `category` fills the category menu. `tags` are the small labels on each card.
 - Search checks the title, category, tags, ingredients, steps, and notes.
-- Add `hidden: true` to keep a recipe off the public site (see **Hide a recipe** below).
+- Add `hidden: true` to keep a recipe off the public site; only the site owner will see it (see **Hide a recipe** below).
 
 ## Add a recipe from a link (on the site)
 
@@ -109,15 +109,17 @@ Any recipe can be edited this way, including the ones written in `recipes.js`. F
 
 ## Hide a recipe
 
-Hiding takes a recipe off the public site without deleting it: visitors don't see it in the list, in search, in the meal planner, or at its link. Its reviews and edits are kept.
+Hiding takes a recipe off the public site without deleting it: visitors and other contributors don't see it in the list, in search, in the meal planner, or at its link. **Only the site owner can hide a recipe, show it again, or see hidden recipes.** Reviews, edits and the recipe's own category are kept.
 
-**On the site:** sign in, open the recipe, and click **Hide from site** next to **Edit**. Signed-in contributors still see hidden recipes, greyed out and marked **Hidden from the public**, so they can check or edit them. To publish it again, open it and click **Show on site**. Changes show for visitors the next time they load the page.
+**On the site:** sign in as the owner, open the recipe, and click **Hide from site** next to **Edit**. It moves to a grey **Hidden** category that only you see. To publish it again, open it and click **Show on site**; it goes back to its own category. Visitors see the change the next time they load the page.
 
 **In `recipes.js`:** add `hidden: true` to the recipe (for example, a draft you are still writing), and raise `recipes.js?v=` in `index.html`. Remove the line to publish it. Recipes hidden this way can't be shown from the site's button.
 
-Keep in mind that `recipes.js` is a public file, so anyone who opens it directly can still read a recipe written there, even when it's hidden. Recipes added on the site and then hidden are not sent to visitors at all.
+Keep in mind that `recipes.js` is a public file, so anyone who opens it directly can still read a recipe written there, even when it's hidden. Recipes added on the site and then hidden are never sent to anyone but the owner.
 
-**One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-hiding.sql`, and click **Run**. Until then, the button says hiding isn't switched on yet (`hidden: true` in `recipes.js` works without it). The SQL adds the `hidden_recipes` table (the list of hidden ids, which anyone can read and only contributors can change) and the `contributor_set_recipe_hidden()` and `contributor_hidden_recipes()` functions.
+**One-time setup:** in Supabase open **SQL Editor** and paste `supabase/add-recipe-hiding.sql`. At the very bottom, change `YOUR-EMAIL@example.com` to the email you sign in to the site with, then click **Run**. Until then, nobody sees the hide button (`hidden: true` in `recipes.js` still works). To make someone else the owner later, run the last block of that file again with their email.
+
+How it works: `private.site_owner` holds the owner's account. The site asks `am_i_site_owner()` after sign-in, hides with `owner_set_recipe_hidden()`, and loads hidden site recipes with `owner_hidden_recipes()`; all three check the owner in the database, so the rule can't be got around from the browser. `public.hidden_recipes` is the list of hidden ids that the site reads to leave those recipes out.
 
 ## Barcelona tile
 
