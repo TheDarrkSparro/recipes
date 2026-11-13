@@ -106,9 +106,9 @@ Any recipe can be edited this way, including the ones written in `recipes.js`. F
 
 **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-editing.sql`, and click **Run**. Until then, saving changes says editing isn't switched on yet.
 
-## Contributor guide (PDF)
+## Contributor guide
 
-`guide/how-to-add-and-edit-recipes.pdf` is the step-by-step guide for people who add and edit recipes. It's linked from the **Add a recipe** page and from the footer of every page. To update it, replace that file with a new PDF under the same name, raise the `?v=` numbers for `add-recipe.js` in `index.html` if you change the link text, and push.
+`guide/index.html` is a step-by-step page for people who add and edit recipes, at `/guide/` on the site. It's linked from the **Add a recipe** page and from the footer of every page. The screenshots are in `guide/img/`. To change the wording, edit `guide/index.html`; its styles are in `styles.css` under "Contributor guide".
 
 ## Hosting on Cloudflare
 

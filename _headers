@@ -14,11 +14,3 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   X-Frame-Options: DENY
-
-# The contributor guide PDF opens in the browser's own PDF viewer, which the
-# page rules above would block, so they're left off for this folder.
-/guide/*
-  ! Content-Security-Policy
-  ! X-Frame-Options
-  Content-Disposition: inline; filename="Dark-Sparrow-Eats-Recipe-Guide.pdf"
-  Cache-Control: public, max-age=3600

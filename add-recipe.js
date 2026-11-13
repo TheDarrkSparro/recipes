@@ -139,7 +139,7 @@
         : '<a class="back" href="#/">' + backIcon + "All recipes</a>" +
           '<h1 class="add-title">Add a recipe</h1>' +
           '<p class="add-sub">Paste a link to a recipe page, or take a photo of a recipe card or cookbook page, and the details fill in for you to check. Or type a family recipe in by hand. You can add a photo of the dish on the next step.</p>' +
-          '<p class="add-guide">New here? <a href="guide/how-to-add-and-edit-recipes.pdf" target="_blank" rel="noopener">Read the step-by-step guide (PDF)</a>.</p>') +
+          '<p class="add-guide">New here? <a href="/guide/">Read the step-by-step guide</a>.</p>') +
 
       (editing ? "" :
 
