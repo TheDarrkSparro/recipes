@@ -120,6 +120,22 @@ Each recipe can show **Contributed by …** under its title, for example "Contri
 
 Every recipe page has a **Keep screen on** switch next to **Print**, so a phone or tablet doesn't dim or lock while someone cooks. Once switched on, it stays on for other recipes opened in the same tab, and turns itself off when leaving recipe pages. It uses the browser's Screen Wake Lock feature, which works in current Chrome, Edge, Safari (iPhone and iPad with iOS 16.4 or later) and Firefox. On browsers without it, the switch doesn't appear. Battery saver mode can stop it from working; the page says so if that happens.
 
+## Printing
+
+Printing a recipe page (the **Print** button, or Ctrl+P) gives a designed recipe card, usually on one letter-size page:
+
+- a red and gold **The Dark Sparrow Eats** banner with the sparrow
+- the title, with **~ From the kitchen of … ~** when the recipe has a contributor name
+- time, servings and ingredient count in small boxes
+- an **ingredient checklist** with tick boxes to mark in pencil, beside the **numbered method**
+- the **Cook's notes** on a gold card, and where the recipe was adapted from
+- ruled lines for **My notes**, and a **QR code** that opens the recipe on a phone
+- the date it was printed
+
+The photo, ratings, reviews, buttons and site menus are left off to save ink and space. Colours print when the browser's "Background graphics" option is on. Long recipes continue onto a second page.
+
+The QR codes are drawn by `qrcode.min.js` (qrcode-generator 1.4.4 by Kazuhiko Arase, MIT licence), so nothing is sent to another site.
+
 ## Barcelona tile
 
 The site's paving pattern is an original drawing in the spirit of Barcelona's *panot de flor* sidewalk tile. It appears tone-on-tone in the red header, as a tile bed behind the home page photo, and as a sidewalk strip above the footer. The tiles are small SVG files in `img/` (`panot-red.svg`, `panot-sand.svg`), placed by `styles.css`. To change their colors, edit the `COLORWAYS` in `img/make-panot.py` and run `python3 img/make-panot.py img`.
