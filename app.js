@@ -658,6 +658,18 @@
         (state.query.trim() ? " matching “" + state.query.trim() + "”" : "");
     }
 
+    // Recipes live in the database; wait for them before saying there are none.
+    if (!recipes.length && !allLoaded) {
+      box.innerHTML = '<p class="loading">Loading recipes…</p>';
+      return;
+    }
+    if (!recipes.length && savedState === "failed") {
+      box.innerHTML = emptyBlock(
+        "The recipes didn't load",
+        "Couldn't reach the recipe database. Check your connection and refresh the page."
+      );
+      return;
+    }
     if (!recipes.length) {
       box.innerHTML = emptyBlock(
         "No recipes yet",
