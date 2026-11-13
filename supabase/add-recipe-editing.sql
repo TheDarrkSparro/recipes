@@ -29,7 +29,9 @@ begin
     return jsonb_build_object('ok', false, 'error', 'too_many_attempts');
   end if;
 
-  select code_hash into v_hash from private.owner_code where id = 1;
+  -- Written as an assignment (not SELECT ... INTO) so the Supabase SQL
+  -- Editor doesn't mistake it for creating a table.
+  v_hash := (select code_hash from private.owner_code where id = 1);
   if v_hash is null or p_code is null or length(p_code) > 100
      or extensions.crypt(p_code, v_hash) <> v_hash then
     insert into private.owner_code_failures default values;
