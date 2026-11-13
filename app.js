@@ -539,6 +539,7 @@
     return [
       str(recipe.title),
       str(recipe.category),
+      str(recipe._contributor),
       str(recipe.notes),
       stringList(recipe.tags).join("\n"),
       stringList(recipe.ingredients).join("\n"),
@@ -1481,6 +1482,279 @@
   }
 
 
+
+  /* ---------- The cooks page: every contributor and their numbers ---------- */
+
+  function cookSlug(name) {
+    return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "cook";
+  }
+
+  function initials(name) {
+    var parts = name.replace(/[^A-Za-zÀ-ÿ' -]/g, " ").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+
+  function stars(avg) {
+    return "★ " + (Math.round(avg * 10) / 10).toFixed(1);
+  }
+
+  /* The recipes moved from recipes.js got placeholder dates around
+     1 January 2026 (to keep their order); those aren't real "added" dates. */
+  function realAdded(r) {
+    var t = r && r._added ? Date.parse(r._added) : NaN;
+    return !isNaN(t) && t >= Date.parse("2026-01-02T00:00:00Z") ? r._added : "";
+  }
+
+  function shortDate(iso) {
+    var d = iso ? new Date(iso) : null;
+    return d && !isNaN(d) ? d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
+  }
+
+  function cookStats() {
+    var byName = Object.create(null);
+    var uncredited = 0;
+    var shown = recipes.filter(function (r) {
+      return !r._hidden;
+    });
+    shown.forEach(function (r) {
+      var name = str(r._contributor);
+      if (!name) {
+        uncredited += 1;
+        return;
+      }
+      (byName[name] = byName[name] || []).push(r);
+    });
+    var cooks = Object.keys(byName).map(function (name) {
+      var list = byName[name];
+      var cats = Object.create(null);
+      var reviews = 0;
+      var weighted = 0;
+      var loved = null;
+      var newest = null;
+      list.forEach(function (r) {
+        var c = categoryOf(r);
+        cats[c] = (cats[c] || 0) + 1;
+        var st = statFor(r);
+        reviews += st.count;
+        weighted += st.avg * st.count;
+        if (st.count && (!loved || st.avg > loved.s.avg || (st.avg === loved.s.avg && st.count > loved.s.count))) loved = { r: r, s: st };
+        if (realAdded(r) && (!newest || realAdded(r) > realAdded(newest))) newest = r;
+      });
+      var catNames = Object.keys(cats).sort(function (a, b) {
+        return cats[b] - cats[a] || a.localeCompare(b);
+      });
+      return {
+        name: name,
+        recipes: list.slice().sort(byTitle),
+        count: list.length,
+        cats: catNames,
+        catCounts: cats,
+        signature: catNames[0],
+        reviews: reviews,
+        avg: reviews ? weighted / reviews : 0,
+        loved: loved,
+        newest: newest
+      };
+    });
+    cooks.sort(function (a, b) {
+      return b.count - a.count || b.reviews - a.reviews || a.name.localeCompare(b.name);
+    });
+    return { cooks: cooks, uncredited: uncredited, total: shown.length };
+  }
+
+  /* Fun awards, each to one clear winner (no award on a tie). */
+  function cookAwards(cooks) {
+    var awards = Object.create(null);
+    function give(label, icon, score, min) {
+      var best = null;
+      var tie = false;
+      cooks.forEach(function (c) {
+        var v = score(c);
+        if (v == null || v < (min || 0)) return;
+        if (!best || v > best.v) {
+          best = { c: c, v: v };
+          tie = false;
+        } else if (v === best.v) {
+          tie = true;
+        }
+      });
+      if (best && !tie) (awards[best.c.name] = awards[best.c.name] || []).push({ label: label, icon: icon });
+    }
+    if (cooks.length > 1) {
+      give("Most recipes", "📚", function (c) { return c.count; }, 2);
+      give("Top rated", "⭐", function (c) { return c.reviews >= 3 ? c.avg : null; }, 4);
+      give("Most reviewed", "💬", function (c) { return c.reviews; }, 1);
+      give("Widest range", "🧭", function (c) { return c.cats.length; }, 3);
+      give("Newest addition", "🌱", function (c) {
+        var t = c.newest ? Date.parse(realAdded(c.newest)) : NaN;
+        return isNaN(t) ? null : t;
+      });
+    }
+    return awards;
+  }
+
+  function renderCooks() {
+    document.title = "Our cooks · The Dark Sparrow Eats";
+    if (!allLoaded) {
+      app.innerHTML = '<p class="loading">Gathering the cooks…</p>';
+      return;
+    }
+    // Ratings feed the averages; draw now and again when they arrive.
+    if (!statsMap && window.Reviews && window.Reviews.getStats && !renderCooks._asked) {
+      renderCooks._asked = true;
+      window.Reviews.getStats()
+        .then(function (map) {
+          statsMap = map || null;
+          if (current.name === "cooks") renderCooks();
+        })
+        .catch(function () {
+          /* Ratings are optional. */
+        });
+    }
+
+    var data = cookStats();
+    var cooks = data.cooks;
+    var awards = cookAwards(cooks);
+    var credited = data.total - data.uncredited;
+    var allReviews = cooks.reduce(function (n, c) { return n + c.reviews; }, 0);
+    var maxCount = cooks.reduce(function (m, c) { return Math.max(m, c.count); }, 0);
+    var back = '<a class="back" href="#/">' + backArrow() + "All recipes</a>";
+
+    var head =
+      '<header class="cooks-head">' +
+      '<h1 class="cooks-title">Our cooks</h1>' +
+      '<p class="cooks-sub">The people behind the recipes, and how their dishes are doing.</p>' +
+      "</header>";
+
+    if (!cooks.length) {
+      app.innerHTML =
+        back + '<section class="cooks">' + head +
+        emptyBlock(
+          "No cooks credited yet",
+          ownerMode()
+            ? "Open any recipe and click <strong>Add contributor</strong> under its title. Names show up here as soon as they're saved."
+            : "Recipes get a cook's name once Art adds one. Check back soon."
+        ) +
+        ownerAccountsHtml() +
+        "</section>";
+      return;
+    }
+
+    var summary =
+      '<dl class="cooks-summary">' +
+      '<div><dt>Cooks</dt><dd>' + cooks.length + "</dd></div>" +
+      '<div><dt>Recipes credited</dt><dd>' + credited + '<small> of ' + data.total + "</small></dd></div>" +
+      '<div><dt>Reviews earned</dt><dd>' + allReviews + "</dd></div>" +
+      "</dl>";
+
+    var board =
+      '<section class="cooks-board" aria-labelledby="board-h">' +
+      '<h2 id="board-h">Recipes by cook</h2>' +
+      '<ol class="board">' +
+      cooks
+        .map(function (c) {
+          var pct = maxCount ? Math.max(6, Math.round((c.count / maxCount) * 100)) : 0;
+          return (
+            '<li><button type="button" class="board-name" data-cook="' + esc(cookSlug(c.name)) + '">' + esc(c.name) + "</button>" +
+            '<span class="board-bar hue-' + hue(c.name) + '"><span style="width:' + pct + '%"></span></span>' +
+            '<span class="board-n">' + c.count + "</span></li>"
+          );
+        })
+        .join("") +
+      "</ol></section>";
+
+    var cards =
+      '<div class="cook-grid">' +
+      cooks
+        .map(function (c) {
+          var aw = awards[c.name] || [];
+          return (
+            '<article class="cook-card hue-' + hue(c.name) + '" id="cook-' + esc(cookSlug(c.name)) + '">' +
+            '<header class="cook-top">' +
+            '<span class="cook-avatar" aria-hidden="true">' + esc(initials(c.name)) + "</span>" +
+            '<div><h2 class="cook-name">' + esc(c.name) + "</h2>" +
+            '<p class="cook-sig">Signature: <strong>' + esc(c.signature) + "</strong></p></div>" +
+            "</header>" +
+            (aw.length
+              ? '<ul class="cook-awards">' +
+                aw.map(function (a) { return '<li><span aria-hidden="true">' + a.icon + "</span> " + esc(a.label) + "</li>"; }).join("") +
+                "</ul>"
+              : "") +
+            '<dl class="cook-stats">' +
+            "<div><dt>Recipes</dt><dd>" + c.count + "</dd></div>" +
+            "<div><dt>Rating</dt><dd>" + (c.reviews ? stars(c.avg) : "–") + "</dd></div>" +
+            "<div><dt>Reviews</dt><dd>" + c.reviews + "</dd></div>" +
+            "<div><dt>Categories</dt><dd>" + c.cats.length + "</dd></div>" +
+            "</dl>" +
+            (c.loved
+              ? '<p class="cook-pick"><span>Most loved</span><a href="#/recipe/' + esc(encodeURIComponent(recipeId(c.loved.r))) + '">' + esc(titleOf(c.loved.r)) + "</a> " +
+                '<small>' + stars(c.loved.s.avg) + " · " + c.loved.s.count + (c.loved.s.count === 1 ? " review" : " reviews") + "</small></p>"
+              : "") +
+            (c.newest
+              ? '<p class="cook-pick"><span>Newest addition</span><a href="#/recipe/' + esc(encodeURIComponent(recipeId(c.newest))) + '">' + esc(titleOf(c.newest)) + "</a>" +
+                (shortDate(realAdded(c.newest)) ? " <small>" + esc(shortDate(realAdded(c.newest))) + "</small>" : "") + "</p>"
+              : "") +
+            '<details class="cook-recipes"><summary>All ' + c.count + (c.count === 1 ? " recipe" : " recipes") + "</summary><ul>" +
+            c.recipes
+              .map(function (r) {
+                var st = statFor(r);
+                return '<li><a href="#/recipe/' + esc(encodeURIComponent(recipeId(r))) + '">' + esc(titleOf(r)) + "</a>" +
+                  '<span class="cook-r-meta">' + esc(categoryOf(r)) + (st.count ? " · " + stars(st.avg) : "") + "</span></li>";
+              })
+              .join("") +
+            "</ul></details>" +
+            "</article>"
+          );
+        })
+        .join("") +
+      "</div>";
+
+    var note = data.uncredited
+      ? '<p class="cooks-note">' + data.uncredited + (data.uncredited === 1 ? " recipe doesn't" : " recipes don't") + " have a cook's name yet." +
+        (ownerMode() ? " Add one from the recipe's page." : "") + "</p>"
+      : "";
+
+    app.innerHTML = back + '<section class="cooks">' + head + summary + board + cards + note + ownerAccountsHtml() + "</section>";
+    // The site's links use #/..., so the leaderboard scrolls instead of linking.
+    app.querySelector(".board").addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("[data-cook]") : null;
+      var card = b && document.getElementById("cook-" + b.getAttribute("data-cook"));
+      if (card && card.scrollIntoView) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  /* Owner only: which site accounts added recipes. */
+  function ownerAccountsHtml() {
+    if (!ownerMode()) return "";
+    var byAcct = Object.create(null);
+    Object.keys(contribDetails).forEach(function (id) {
+      var d = contribDetails[id];
+      if (!d || !d.addedBy) return;
+      var a = (byAcct[d.addedBy] = byAcct[d.addedBy] || { n: 0, last: "" });
+      a.n += 1;
+      if ((d.addedAt || "") > a.last) a.last = d.addedAt || "";
+    });
+    var accts = Object.keys(byAcct).sort(function (x, y) {
+      return byAcct[y].n - byAcct[x].n || x.localeCompare(y);
+    });
+    return (
+      '<section class="cooks-accounts" aria-labelledby="acct-h">' +
+      '<h2 id="acct-h">Accounts that added recipes <small>Only you see this</small></h2>' +
+      (accts.length
+        ? '<table><thead><tr><th scope="col">Account</th><th scope="col">Recipes added</th><th scope="col">Last added</th></tr></thead><tbody>' +
+          accts
+            .map(function (e) {
+              return "<tr><td>" + esc(e) + "</td><td>" + byAcct[e].n + "</td><td>" + esc(shortDate(byAcct[e].last)) + "</td></tr>";
+            })
+            .join("") +
+          "</tbody></table>"
+        : '<p class="muted">None recorded yet. New recipes are recorded from now on.</p>') +
+      "</section>"
+    );
+  }
+
   /* ---------- Edit the category list (site owner only) ---------- */
 
   var CATEGORY_ERRORS = {
@@ -1802,6 +2076,7 @@
     if (/^\/?add\/?$/.test(hash)) return { name: "add" };
     if (/^\/?family\/?$/.test(hash)) return { name: "family" };
     if (/^\/?categories\/?$/.test(hash)) return { name: "categories" };
+    if (/^\/?cooks\/?$/.test(hash)) return { name: "cooks" };
     var si = hash.match(/^\/?signin(?:\/(plan|shopping))?\/?$/);
     if (si) return { name: "signin", next: si[1] || "" };
     var plan = hash.match(/^\/?(plan|shopping)(?:\/(\d{4}-\d{2}-\d{2}))?\/?$/);
@@ -1833,6 +2108,7 @@
     else if (current.name === "add") renderAdd();
     else if (current.name === "family") renderFamily();
     else if (current.name === "categories") renderCategories();
+    else if (current.name === "cooks") renderCooks();
     else if (current.name === "edit") renderEdit(current.id);
     else if (current.name === "plan" || current.name === "shopping") renderPlanner(current.name, current.week);
     else if (current.name === "signin") {
@@ -1889,6 +2165,8 @@
           renderDetail(current.id);
         } else if (current.name === "categories") {
           renderCategories();
+        } else if (current.name === "cooks") {
+          renderCooks();
         }
       });
     });
@@ -1904,6 +2182,8 @@
       else repaintContributor();
     } else if (current.name === "edit") {
       renderEdit(current.id);
+    } else if (current.name === "cooks") {
+      renderCooks();
     } else if ((current.name === "add" || current.name === "categories") && app.querySelector(".loading")) {
       if (current.name === "add") renderAdd();
       else renderCategories();

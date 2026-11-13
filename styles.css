@@ -1290,7 +1290,7 @@ h1[tabindex="-1"]:focus, h2[tabindex="-1"]:focus { box-shadow: none; outline: no
 .album-photo figcaption { margin-top: 0.6rem; color: var(--slate); font-size: 0.95rem; }
 
 @media (max-width: 640px) {
-  .nav-link.nav-family { display: none; }
+  .nav-link.nav-family, .nav-link.nav-cooks { display: none; }
   .album-grid { gap: 1.5rem; }
 }
 
@@ -1645,4 +1645,68 @@ h1[tabindex="-1"]:focus, h2[tabindex="-1"]:focus { box-shadow: none; outline: no
     font-style: italic;
     color: #5b6670;
   }
+}
+
+/* ---------- Our cooks page ---------- */
+.cooks { max-width: 62rem; }
+.cooks-head { margin: 0.5rem 0 1.25rem; }
+.cooks-title { font-family: var(--serif); font-size: clamp(2rem, 4.5vw, 2.7rem); margin: 0; }
+.cooks-sub { margin: 0.35rem 0 0; color: var(--slate); }
+
+.cooks-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 0 0 1.75rem; }
+.cooks-summary div { background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--sage); border-radius: var(--radius); padding: 0.8rem 1rem; }
+.cooks-summary dt { font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.cooks-summary dd { margin: 0.15rem 0 0; font-family: var(--serif); font-size: 1.9rem; font-weight: 700; color: var(--ink); }
+.cooks-summary dd small { font-family: var(--sans); font-size: 0.95rem; font-weight: 500; color: var(--muted); }
+
+.cooks-board { margin: 0 0 2rem; }
+.cooks-board h2, .cooks-accounts h2 { font-family: var(--serif); font-size: 1.35rem; margin: 0 0 0.75rem; }
+.board { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
+.board li { display: grid; grid-template-columns: minmax(7rem, 12rem) 1fr 2.5rem; align-items: center; gap: 0.75rem; }
+.board-name { justify-self: start; background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 0.2em; }
+.board-name:hover { color: var(--hue); text-decoration-color: currentColor; }
+.board-name:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 2px; }
+.board-bar { display: block; height: 0.9rem; background: var(--line-soft); border-radius: 999px; overflow: hidden; }
+.board-bar span { display: block; height: 100%; background: var(--hue); border-radius: 999px; }
+.board-n { font-weight: 700; color: var(--slate); font-variant-numeric: tabular-nums; }
+
+.cook-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(18.5rem, 1fr)); gap: 1.25rem; }
+.cook-card { background: var(--card); border: 1px solid var(--line); border-top: 5px solid var(--hue); border-radius: var(--radius); padding: 1.1rem 1.2rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; scroll-margin-top: 5rem; }
+.cook-top { display: flex; align-items: center; gap: 0.85rem; }
+.cook-avatar { flex: none; width: 3.1rem; height: 3.1rem; border-radius: 50%; background: var(--hue); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 1.2rem; box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--saffron); }
+.cook-name { font-family: var(--serif); font-size: 1.3rem; margin: 0; line-height: 1.2; }
+.cook-sig { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.cook-sig strong { color: var(--slate); }
+.cook-awards { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.cook-awards li { background: var(--saffron-wash); color: #5c4300; border: 1px solid #f3dc85; border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.82rem; font-weight: 600; }
+.cook-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4rem; margin: 0; padding: 0.6rem 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); text-align: center; }
+.cook-stats dt { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.cook-stats dd { margin: 0.1rem 0 0; font-weight: 700; font-size: 1.05rem; color: var(--ink); white-space: nowrap; }
+.cook-pick { margin: 0; font-size: 0.95rem; line-height: 1.4; }
+.cook-pick span { display: block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.cook-pick a { font-weight: 600; color: var(--ink); }
+.cook-pick a:hover { color: var(--hue); }
+.cook-pick small { color: var(--muted); }
+.cook-recipes summary { cursor: pointer; font-weight: 600; color: var(--hue); font-size: 0.92rem; }
+.cook-recipes ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.cook-recipes li { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.3rem 0; border-bottom: 1px dotted var(--line); font-size: 0.93rem; }
+.cook-recipes li a { color: var(--ink); }
+.cook-r-meta { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+.cooks-note { margin: 1.5rem 0 0; color: var(--muted); font-style: italic; }
+
+.cooks-accounts { margin: 2.25rem 0 0; padding: 1rem 1.2rem; border: 1px dashed var(--muted); border-radius: var(--radius); background: #f3efe8; }
+.cooks-accounts h2 small { font-family: var(--sans); font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-left: 0.4rem; }
+.cooks-accounts table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+.cooks-accounts th, .cooks-accounts td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
+.cooks-accounts th { font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .cooks-summary { grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; }
+  .cooks-summary div { padding: 0.6rem 0.65rem; }
+  .cooks-summary dd { font-size: 1.45rem; }
+  .board li { grid-template-columns: 6.5rem 1fr 2rem; gap: 0.5rem; }
+}
+@media print {
+  .cooks-accounts, .cook-recipes summary { display: none; }
+  .cook-recipes ul { display: block; }
 }
