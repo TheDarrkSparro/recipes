@@ -688,7 +688,7 @@
     });
 
     if (window.Planner && rid) {
-      window.Planner.mountAddButton(document.getElementById("plan-add"), { id: rid, title: titleOf(recipe) }, function (pid) {
+      window.Planner.mountAddButton(document.getElementById("plan-add"), { id: rid, title: titleOf(recipe), category: str(recipe.category) }, function (pid) {
         var r = findRecipe(pid);
         return r ? titleOf(r) : "a recipe";
       });

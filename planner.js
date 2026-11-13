@@ -2,7 +2,7 @@
  * Weekly meal plan (#/plan) and shopping list (#/shopping), plus the
  * "Add to meal plan" button on recipe pages.
  *
- * - One dinner per day, weeks run Sunday to Saturday.
+ * - Breakfast, lunch and dinner each day; weeks run Sunday to Saturday.
  * - Everything is saved in this browser on this device (localStorage), so
  *   no account is needed. Clearing the browser's site data clears the plan.
  * - The shopping list groups the same ingredient from different recipes
@@ -11,7 +11,10 @@
 (function () {
   "use strict";
 
-  var PLAN_STORE = "dse-meal-plan"; // { "YYYY-MM-DD": { id: "recipe-id" } | { note: "Pizza night" } }
+  // { "YYYY-MM-DD": { breakfast: { id: "recipe-id" }, lunch: { note: "Leftovers" }, dinner: {...} } }
+  // (Plans saved before breakfast and lunch were added hold one { id } or
+  // { note } per day; those are read as dinner.)
+  var PLAN_STORE = "dse-meal-plan";
   var SHOP_STORE = "dse-shopping"; // { "<week start>": { have: { key: true }, extras: [{ id, text, have }] } }
   var memory = {};
 
@@ -86,12 +89,44 @@
 
   /* ---------- Plan storage ---------- */
 
-  function getPlan() {
-    return read(PLAN_STORE);
+  var MEALS = [
+    { key: "breakfast", label: "Breakfast" },
+    { key: "lunch", label: "Lunch" },
+    { key: "dinner", label: "Dinner" }
+  ];
+  var MEAL_LABEL = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
+
+  function filled(slot) {
+    return !!(slot && (slot.id || (slot.note != null && slot.note !== "")));
   }
-  function setDay(key, value) {
+
+  /* One day's meals, whatever format they were saved in. */
+  function dayMeals(entry) {
+    if (!entry || typeof entry !== "object") return {};
+    if (entry.id || entry.note != null) return { dinner: entry.id ? { id: entry.id } : { note: entry.note } };
+    var out = {};
+    MEALS.forEach(function (m) {
+      if (filled(entry[m.key])) out[m.key] = entry[m.key];
+    });
+    return out;
+  }
+
+  function getPlan() {
+    var raw = read(PLAN_STORE);
+    var plan = {};
+    Object.keys(raw).forEach(function (k) {
+      var meals = dayMeals(raw[k]);
+      if (Object.keys(meals).length) plan[k] = meals;
+    });
+    return plan;
+  }
+
+  function setMeal(key, meal, value) {
     var plan = getPlan();
-    if (value && (value.id || value.note)) plan[key] = value;
+    var day = plan[key] || {};
+    if (filled(value)) day[meal] = value.id ? { id: value.id } : { note: value.note };
+    else delete day[meal];
+    if (Object.keys(day).length) plan[key] = day;
     else delete plan[key];
     // Keep a year back at most.
     var cutoff = dayKey(addDays(today(), -366));
@@ -99,6 +134,31 @@
       if (k < cutoff) delete plan[k];
     });
     write(PLAN_STORE, plan);
+  }
+
+  function clearDay(key) {
+    var plan = getPlan();
+    delete plan[key];
+    write(PLAN_STORE, plan);
+  }
+
+  function mealsIn(plan, days) {
+    var n = 0;
+    days.forEach(function (d) {
+      var day = plan[dayKey(d)] || {};
+      MEALS.forEach(function (m) {
+        if (filled(day[m.key])) n++;
+      });
+    });
+    return n;
+  }
+
+  /* Breakfast recipes default to breakfast; everything else to dinner. */
+  function mealFor(category) {
+    var c = String(category || "").toLowerCase();
+    if (/breakfast|brunch|pancake|waffle/.test(c)) return "breakfast";
+    if (/lunch|sandwich|salad/.test(c)) return "lunch";
+    return "dinner";
   }
 
   function weekDays(start) {
@@ -154,6 +214,29 @@
 
   /* ---------- Meal plan page ---------- */
 
+  function slotHtml(k, d, meal, slot, map, ctx) {
+    var r = slot && slot.id ? map[slot.id] : null;
+    var value = slot && slot.id ? "r:" + slot.id : filled(slot) ? "note" : "";
+    var missing = slot && slot.id && !r;
+    var id = "pick-" + k + "-" + meal.key;
+    return (
+      '<div class="plan-slot' + (value ? " is-set" : "") + '" data-meal="' + meal.key + '">' +
+      '<label class="plan-meal" for="' + id + '">' + meal.label + "</label>" +
+      '<select id="' + id + '" class="plan-select" aria-label="' + meal.label + " on " + DAYS[d.getDay()] + '">' +
+      '<option value="">—</option>' +
+      '<option value="note"' + (value === "note" ? " selected" : "") + ">Write a note…</option>" +
+      (missing
+        ? '<option value="r:' + esc(slot.id) + '" selected>' + (ctx.loading ? "Loading…" : "A recipe that’s no longer on the site") + "</option>"
+        : "") +
+      recipeOptions(ctx.recipes, (slot && slot.id) || "") +
+      "</select>" +
+      '<input class="plan-note" type="text" maxlength="80" placeholder="e.g. Leftovers" value="' + esc((slot && slot.note) || "") + '"' +
+      (value === "note" ? "" : " hidden") + ' aria-label="' + meal.label + " note for " + DAYS[d.getDay()] + '">' +
+      (r ? '<a class="plan-open" href="#/recipe/' + encodeURIComponent(r.id) + '">Open recipe' + arrowR + "</a>" : "") +
+      "</div>"
+    );
+  }
+
   function mountPlan(root, ctx) {
     var start = weekFrom(ctx.week);
     var startKey = dayKey(start);
@@ -164,41 +247,29 @@
     var days = weekDays(start);
     document.title = "Meal plan · The Dark Sparrow Eats";
 
-    var count = 0;
     var rows = days
       .map(function (d) {
         var k = dayKey(d);
-        var entry = plan[k] || {};
-        var r = entry.id ? map[entry.id] : null;
-        if (entry.id || entry.note) count++;
-        var value = entry.id ? "r:" + entry.id : entry.note != null && entry.note !== "" ? "note" : "";
-        var missing = entry.id && !r;
+        var day = plan[k] || {};
         return (
-          '<li class="plan-day' + (k === todayKey ? " is-today" : "") + (value ? " is-set" : "") + '" data-day="' + k + '">' +
+          '<li class="plan-day' + (k === todayKey ? " is-today" : "") + '" data-day="' + k + '">' +
           '<div class="plan-date"><span class="plan-dow">' + DAYS[d.getDay()] + "</span>" +
           '<span class="plan-dm">' + MONTHS[d.getMonth()] + " " + d.getDate() + (k === todayKey ? ' <span class="plan-today">Today</span>' : "") + "</span></div>" +
-          '<div class="plan-pick">' +
-          '<label class="sr-only" for="pick-' + k + '">Dinner on ' + DAYS[d.getDay()] + "</label>" +
-          '<select id="pick-' + k + '" class="plan-select">' +
-          '<option value="">— No dinner planned —</option>' +
-          '<option value="note"' + (value === "note" ? " selected" : "") + ">Write a note (leftovers, eating out…)</option>" +
-          (missing
-            ? '<option value="r:' + esc(entry.id) + '" selected>' + (ctx.loading ? "Loading…" : "A recipe that’s no longer on the site") + "</option>"
-            : "") +
-          recipeOptions(ctx.recipes, entry.id || "") +
-          "</select>" +
-          '<input class="plan-note" type="text" maxlength="80" placeholder="e.g. Leftovers, pizza night" value="' + esc(entry.note || "") + '"' + (value === "note" ? "" : " hidden") + ' aria-label="Note for ' + DAYS[d.getDay()] + '">' +
-          (r ? '<a class="plan-open" href="#/recipe/' + encodeURIComponent(r.id) + '">Open recipe' + arrowR + "</a>" : "") +
+          '<div class="plan-meals">' +
+          MEALS.map(function (m) {
+            return slotHtml(k, d, m, day[m.key], map, ctx);
+          }).join("") +
           "</div>" +
           "</li>"
         );
       })
       .join("");
+    var count = mealsIn(plan, days);
 
     root.innerHTML =
       '<section class="plan">' +
       '<h1 class="add-title">Meal plan</h1>' +
-      '<p class="add-sub">Pick a dinner for each day, then get the shopping list. Your plan is saved on this device.</p>' +
+      '<p class="add-sub">Pick breakfast, lunch and dinner for each day (or just the ones you plan), then get the shopping list. Your plan is saved on this device.</p>' +
       '<div class="week-nav">' +
       '<a class="btn btn-quiet week-step" href="#/plan/' + dayKey(addDays(start, -7)) + '" aria-label="Previous week">' + arrowL + "</a>" +
       '<div class="week-label"><strong>' + range(start) + "</strong>" +
@@ -222,51 +293,47 @@
     var clearBtn = root.querySelector("#plan-clear");
 
     function refreshCount() {
-      var p = getPlan();
-      var n = days.filter(function (d) {
-        var e = p[dayKey(d)];
-        return e && (e.id || e.note);
-      }).length;
+      var n = mealsIn(getPlan(), days);
       countEl.textContent = countText(n);
       clearBtn.hidden = !n;
       clearBtn.textContent = "Clear this week";
       clearBtn.removeAttribute("data-armed");
     }
 
-    Array.prototype.forEach.call(root.querySelectorAll(".plan-day"), function (li) {
-      var k = li.getAttribute("data-day");
-      var sel = li.querySelector("select");
-      var note = li.querySelector(".plan-note");
+    Array.prototype.forEach.call(root.querySelectorAll(".plan-slot"), function (box) {
+      var k = box.closest(".plan-day").getAttribute("data-day");
+      var meal = box.getAttribute("data-meal");
+      var sel = box.querySelector("select");
+      var note = box.querySelector(".plan-note");
       sel.addEventListener("change", function () {
         var v = sel.value;
-        var open = li.querySelector(".plan-open");
+        var open = box.querySelector(".plan-open");
         if (open) open.remove();
         if (v === "note") {
           note.hidden = false;
           note.focus();
-          setDay(k, note.value.trim() ? { note: note.value.trim() } : null);
+          setMeal(k, meal, { note: note.value.trim() });
         } else {
           note.hidden = true;
           if (v.indexOf("r:") === 0) {
             var id = v.slice(2);
-            setDay(k, { id: id });
+            setMeal(k, meal, { id: id });
             if (map[id]) {
               var a = document.createElement("a");
               a.className = "plan-open";
               a.href = "#/recipe/" + encodeURIComponent(id);
               a.innerHTML = "Open recipe" + arrowR;
-              li.querySelector(".plan-pick").appendChild(a);
+              box.appendChild(a);
             }
           } else {
-            setDay(k, null);
+            setMeal(k, meal, null);
           }
         }
-        li.classList.toggle("is-set", !!v);
+        box.classList.toggle("is-set", !!v);
         refreshCount();
       });
       note.addEventListener("input", function () {
-        var t = note.value.trim();
-        setDay(k, t ? { note: t } : null);
+        setMeal(k, meal, { note: note.value.trim() });
         refreshCount();
       });
     });
@@ -279,14 +346,14 @@
         return;
       }
       days.forEach(function (d) {
-        setDay(dayKey(d), null);
+        clearDay(dayKey(d));
       });
       mountPlan(root, ctx);
     });
   }
 
   function countText(n) {
-    return n === 0 ? "Nothing planned yet" : n === 1 ? "1 day planned" : n + " days planned";
+    return n === 0 ? "Nothing planned yet" : n === 1 ? "1 meal planned" : n + " meals planned";
   }
 
   /* ---------- Shopping list page ---------- */
@@ -314,8 +381,11 @@
     var plan = getPlan();
     var meals = [];
     weekDays(start).forEach(function (d) {
-      var e = plan[dayKey(d)];
-      if (e && e.id && map[e.id]) meals.push({ day: d, recipe: map[e.id] });
+      var day = plan[dayKey(d)] || {};
+      MEALS.forEach(function (m) {
+        var slot = day[m.key];
+        if (slot && slot.id && map[slot.id]) meals.push({ day: d, meal: m.key, recipe: map[slot.id] });
+      });
     });
     var items = window.Ingredients.group(
       meals.map(function (m) {
@@ -386,7 +456,10 @@
 
     var mealChips = meals
       .map(function (m) {
-        return '<li><a href="#/recipe/' + encodeURIComponent(m.recipe.id) + '"><span>' + DAYS[m.day.getDay()].slice(0, 3) + "</span> " + esc(m.recipe.title) + "</a></li>";
+        return (
+          '<li><a href="#/recipe/' + encodeURIComponent(m.recipe.id) + '"><span>' + DAYS[m.day.getDay()].slice(0, 3) + " " +
+          MEAL_LABEL[m.meal].toLowerCase() + "</span> " + esc(m.recipe.title) + "</a></li>"
+        );
       })
       .join("");
 
@@ -394,12 +467,12 @@
       '<section class="shop">' +
       '<a class="back" href="#/plan/' + week + '">' + arrowL + "Meal plan</a>" +
       '<h1 class="add-title">Shopping list</h1>' +
-      '<p class="add-sub">For dinners ' + range(start) + ". Tick anything you already have and it moves out of the way.</p>" +
+      '<p class="add-sub">For the meals planned ' + range(start) + ". Tick anything you already have and it moves out of the way.</p>" +
       (ctx.loading && !meals.length
         ? '<p class="loading">Loading your recipes…</p>'
         : meals.length
-          ? '<ul class="shop-meals" aria-label="Dinners on this list">' + mealChips + "</ul>"
-          : '<div class="empty"><h2>No dinners planned this week</h2><p>Pick some dinners first and their ingredients show up here. You can still add your own items below.</p><a class="btn" href="#/plan/' + week + '">Plan this week</a></div>') +
+          ? '<ul class="shop-meals" aria-label="Meals on this list">' + mealChips + "</ul>"
+          : '<div class="empty"><h2>No meals planned this week</h2><p>Pick some recipes on the meal plan first and their ingredients show up here. You can still add your own items below.</p><a class="btn" href="#/plan/' + week + '">Plan this week</a></div>') +
       '<div class="shop-actions">' +
       '<button type="button" class="btn btn-quiet" id="shop-print">' +
       '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5.5 7V3h9v4M5.5 14h-2V8.5a1.5 1.5 0 0 1 1.5-1.5h10a1.5 1.5 0 0 1 1.5 1.5V14h-2M5.5 11.5h9V17h-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Print</button>' +
@@ -547,51 +620,66 @@
         return;
       }
       btn.setAttribute("aria-expanded", "true");
-      var plan = getPlan();
-      var t = today();
-      var opts = "";
-      for (var i = 0; i < 14; i++) {
-        var d = addDays(t, i);
-        var k = dayKey(d);
-        var e = plan[k];
-        var taken = e ? (e.id ? titleOf(e.id) : e.note) : "";
-        opts +=
-          '<option value="' + k + '">' +
-          (i === 0 ? "Today, " : i === 1 ? "Tomorrow, " : "") + short(d) +
-          (taken ? " (now: " + esc(taken) + ")" : "") +
-          "</option>";
-      }
       panel = document.createElement("div");
       panel.className = "plan-add-panel";
       panel.innerHTML =
-        '<label class="field"><span class="field-label">Dinner on</span><select>' + opts + "</select></label>" +
+        '<label class="field plan-add-meal"><span class="field-label">Meal</span><select data-meal>' +
+        MEALS.map(function (m) {
+          return '<option value="' + m.key + '">' + m.label + "</option>";
+        }).join("") +
+        "</select></label>" +
+        '<label class="field"><span class="field-label">Day</span><select data-day></select></label>' +
         '<button type="button" class="btn">Add</button>' +
         '<p class="form-msg" role="status" aria-live="polite"></p>';
       // Below the row of buttons, not squeezed into it.
       var row = holder.closest(".recipe-actions") || holder.parentNode;
       row.parentNode.insertBefore(panel, row.nextSibling);
-      var sel = panel.querySelector("select");
+      var mealSel = panel.querySelector("[data-meal]");
+      var daySel = panel.querySelector("[data-day]");
       var go = panel.querySelector(".btn");
       var out = panel.querySelector(".form-msg");
-      // Start on the first free day.
-      for (var j = 0; j < sel.options.length; j++) {
-        if (!plan[sel.options[j].value]) {
-          sel.selectedIndex = j;
-          break;
+      mealSel.value = mealFor(recipe.category);
+
+      // The next 14 days, each saying what's already planned for that meal.
+      function fillDays(keepValue) {
+        var plan = getPlan();
+        var meal = mealSel.value;
+        var t = today();
+        var html = "";
+        var firstFree = "";
+        for (var i = 0; i < 14; i++) {
+          var d = addDays(t, i);
+          var k = dayKey(d);
+          var slot = (plan[k] || {})[meal];
+          var taken = filled(slot) ? (slot.id ? titleOf(slot.id) : slot.note) : "";
+          if (!taken && !firstFree) firstFree = k;
+          html +=
+            '<option value="' + k + '">' +
+            (i === 0 ? "Today, " : i === 1 ? "Tomorrow, " : "") + short(d) +
+            (taken ? " (now: " + esc(taken) + ")" : "") +
+            "</option>";
         }
+        daySel.innerHTML = html;
+        daySel.value = keepValue || firstFree || dayKey(t);
       }
+      fillDays();
+      mealSel.addEventListener("change", function () {
+        fillDays();
+        out.textContent = "";
+      });
+
       go.addEventListener("click", function () {
-        var k = sel.value;
-        setDay(k, { id: recipe.id });
+        var k = daySel.value;
+        var meal = mealSel.value;
+        setMeal(k, meal, { id: recipe.id });
         var d = fromKey(k);
         out.className = "form-msg is-ok";
         out.innerHTML =
-          "Added for " + esc(DAYS[d.getDay()]) + ", " + MONTHS[d.getMonth()] + " " + d.getDate() + ". " +
+          "Added for " + MEAL_LABEL[meal].toLowerCase() + " on " + esc(DAYS[d.getDay()]) + ", " + MONTHS[d.getMonth()] + " " + d.getDate() + ". " +
           '<a href="#/plan/' + dayKey(startOfWeek(d)) + '">See the meal plan</a>';
-        var o = sel.options[sel.selectedIndex];
-        o.textContent = o.textContent.replace(/ \(now: .*\)$/, "") + " (now: " + recipe.title + ")";
+        fillDays(k);
       });
-      sel.focus();
+      mealSel.focus();
     });
   }
 

@@ -792,7 +792,8 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 
 .nav-short { display: none; }
 
-.plan, .shop { max-width: 46rem; }
+.plan { max-width: 64rem; }
+.shop { max-width: 46rem; }
 .week-nav { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 1.25rem; }
 .week-step { padding: 0.55rem 0.7rem; text-decoration: none; }
 .week-label { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; text-align: center; }
@@ -803,7 +804,7 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 .plan-days { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
 .plan-day {
   display: grid;
-  grid-template-columns: 8.5rem 1fr;
+  grid-template-columns: 7.5rem 1fr;
   gap: 0.5rem 1rem;
   align-items: start;
   padding: 0.85rem 0.25rem;
@@ -814,7 +815,10 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 .plan-dow { font-family: var(--serif); font-weight: 600; font-size: 1.05rem; }
 .plan-dm { color: var(--muted); font-size: 0.9rem; }
 .plan-today { display: inline-block; margin-left: 0.3rem; padding: 0 0.4rem; border-radius: 999px; background: var(--sage); color: #fff; font-size: 0.72rem; font-weight: 600; vertical-align: 1px; }
-.plan-pick { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
+.plan-meals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem 0.9rem; min-width: 0; }
+.plan-slot { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.plan-meal { color: var(--muted); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.plan-slot.is-set .plan-meal { color: var(--sage-deep); }
 .plan-select, .plan-note, .plan-add-panel select, .shop-add input {
   width: 100%;
   border: 1px solid #c9cfc8;
@@ -824,7 +828,8 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
   font: inherit;
   color: var(--ink);
 }
-.plan-day.is-set .plan-select { border-color: var(--sage); font-weight: 600; }
+.plan-slot.is-set .plan-select { border-color: var(--sage); font-weight: 600; }
+.plan-select { text-overflow: ellipsis; }
 .plan-select:focus, .plan-note:focus, .plan-add-panel select:focus, .shop-add input:focus { outline: none; border-color: var(--saffron); box-shadow: var(--focus); }
 .plan-note[hidden] { display: none; }
 .plan-open { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.2rem; color: var(--sage-deep); font-size: 0.92rem; font-weight: 600; text-underline-offset: 0.2em; }
@@ -848,6 +853,7 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
   border-radius: var(--radius);
 }
 .plan-add-panel .field { flex: 1 1 14rem; }
+.plan-add-panel .plan-add-meal { flex: 0 1 9rem; }
 .plan-add-panel .form-msg { flex-basis: 100%; }
 .plan-add-panel .form-msg a { color: var(--sage-deep); font-weight: 600; }
 
@@ -887,9 +893,12 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 .shop-add { display: flex; gap: 0.6rem; margin-top: 1.25rem; max-width: 30rem; }
 .shop-add input { flex: 1; min-width: 0; }
 
-@media (max-width: 560px) {
-  .plan-day { grid-template-columns: 1fr; gap: 0.35rem; }
+@media (max-width: 860px) {
+  .plan-day { grid-template-columns: 1fr; gap: 0.5rem; }
   .plan-date { flex-direction: row; align-items: baseline; gap: 0.5rem; padding-top: 0; }
+  .plan-meals { grid-template-columns: 1fr; gap: 0.5rem; }
+  .plan-slot { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr); align-items: center; gap: 0.35rem 0.6rem; }
+  .plan-slot .plan-note, .plan-slot .plan-open { grid-column: 2; }
 }
 @media (max-width: 480px) {
   .nav-long { display: none; }
