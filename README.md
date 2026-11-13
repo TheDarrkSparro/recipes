@@ -116,6 +116,17 @@ Each recipe can show **Contributed by …** under its title, for example "Contri
 
 **One-time setup:** after `add-recipe-hiding.sql`, open Supabase **SQL Editor**, paste `supabase/add-contributors.sql`, and click **Run**. It adds `public.recipe_contributors` (the names, readable by anyone; "added by" readable only through the owner-only `owner_contributor_details()`), `owner_set_contributor()`, and a database trigger that records who added each new recipe.
 
+## Our cooks page
+
+**Cooks** in the menu (and **Our cooks** in the footer) opens a page about everyone credited with a recipe, using the **Contributed by** names:
+
+- totals for the whole site: cooks, recipes credited, reviews earned
+- a **Recipes by cook** bar chart; tap a name to jump to that cook
+- a card for each cook with their recipe count, average rating (weighted by number of reviews), reviews, categories, **signature** category, **most loved** recipe, **newest addition**, and the full list of their recipes
+- fun awards, each given only when one cook clearly leads: Most recipes, Top rated (at least 3 reviews and 4 stars), Most reviewed, Widest range (3+ categories), Newest addition
+
+Hidden recipes are left out. Search on the home page also finds recipes by cook name. The owner also sees, at the bottom, which site **accounts** added recipes and when. The 12 recipes moved from `recipes.js` don't have a real "added" date, so they don't count toward Newest addition.
+
 ## Keep screen on
 
 Every recipe page has a **Keep screen on** switch next to **Print**, so a phone or tablet doesn't dim or lock while someone cooks. Once switched on, it stays on for other recipes opened in the same tab, and turns itself off when leaving recipe pages. It uses the browser's Screen Wake Lock feature, which works in current Chrome, Edge, Safari (iPhone and iPad with iOS 16.4 or later) and Firefox. On browsers without it, the switch doesn't appear. Battery saver mode can stop it from working; the page says so if that happens.
