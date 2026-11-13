@@ -458,10 +458,7 @@
       '<input id="search" type="search" placeholder="Search recipes or ingredients" autocomplete="off" value="' + esc(state.query) + '">' +
       "</form>" +
       "</div>" +
-      '<figure class="intro-photo">' +
-      '<img src="https://images.unsplash.com/photo-1469014221409-dea4fc6a6b2e?auto=format&fit=crop&w=900&q=75" width="900" height="600" alt="A crusty loaf of bread on a wooden board with a bread knife" loading="eager" decoding="async">' +
-      '<figcaption>Photo: <a href="https://unsplash.com/photos/VWQM9MbZDDw" target="_blank" rel="noopener">Arturro on Unsplash</a></figcaption>' +
-      "</figure>" +
+      introPhoto() +
       "</section>" +
       '<nav class="tabs" id="tabs" aria-label="Categories">' + tabsHtml() + "</nav>" +
       '<div class="toolbar">' +
@@ -711,6 +708,71 @@
     return '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.5 5L6.5 10l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
+  /* ---------- Family album ---------- */
+
+  function familyPhotos() {
+    var list = Array.isArray(window.FAMILY_PHOTOS) ? window.FAMILY_PHOTOS : [];
+    return list.filter(function (p) {
+      return p && typeof p.src === "string" && p.src;
+    });
+  }
+
+  function featuredPhoto() {
+    var list = familyPhotos();
+    for (var i = 0; i < list.length; i++) if (list[i].feature) return list[i];
+    return list[0] || null;
+  }
+
+  function photoImg(p, eager) {
+    return (
+      '<img src="' + esc(p.src) + '"' +
+      (p.width && p.height ? ' width="' + Number(p.width) + '" height="' + Number(p.height) + '"' : "") +
+      ' alt="' + esc(p.alt || "") + '" loading="' + (eager ? "eager" : "lazy") + '" decoding="async">'
+    );
+  }
+
+  function introPhoto() {
+    var p = featuredPhoto();
+    if (!p) return "";
+    return (
+      '<figure class="intro-photo is-family">' +
+      '<a class="intro-photo-link" href="#/family">' + photoImg(p, true) + "</a>" +
+      '<figcaption><a href="#/family">From the family album</a></figcaption>' +
+      "</figure>"
+    );
+  }
+
+  function renderFamily() {
+    document.title = "Family album · The Dark Sparrow Eats";
+    var list = familyPhotos();
+    app.innerHTML =
+      '<a class="back" href="#/">' + backArrow() + "All recipes</a>" +
+      '<section class="album">' +
+      '<header class="album-head">' +
+      '<h1 class="album-title">Family album</h1>' +
+      '<p class="album-sub">The people these recipes were cooked for, and by.</p>' +
+      "</header>" +
+      (list.length
+        ? '<ul class="album-grid">' +
+          list
+            .map(function (p, i) {
+              return (
+                '<li class="album-item' + (i === 0 ? " is-lead" : "") + '">' +
+                '<figure class="album-photo">' +
+                '<a href="' + esc(p.src) + '" target="_blank" rel="noopener" aria-label="Open full size photo in a new tab">' +
+                photoImg(p, i === 0) +
+                "</a>" +
+                (p.caption ? "<figcaption>" + esc(p.caption) + "</figcaption>" : "") +
+                "</figure>" +
+                "</li>"
+              );
+            })
+            .join("") +
+          "</ul>"
+        : emptyBlock("No photos yet", "Family photos will show up here.")) +
+      "</section>";
+  }
+
   /* ---------- Add a recipe ---------- */
 
   function renderAdd() {
@@ -836,6 +898,7 @@
       /* Keep the raw hash if it is not valid encoding. */
     }
     if (/^\/?add\/?$/.test(hash)) return { name: "add" };
+    if (/^\/?family\/?$/.test(hash)) return { name: "family" };
     var si = hash.match(/^\/?signin(?:\/(plan|shopping))?\/?$/);
     if (si) return { name: "signin", next: si[1] || "" };
     var plan = hash.match(/^\/?(plan|shopping)(?:\/(\d{4}-\d{2}-\d{2}))?\/?$/);
@@ -864,6 +927,7 @@
     markNav();
     if (current.name === "detail") renderDetail(current.id);
     else if (current.name === "add") renderAdd();
+    else if (current.name === "family") renderFamily();
     else if (current.name === "edit") renderEdit(current.id);
     else if (current.name === "plan" || current.name === "shopping") renderPlanner(current.name, current.week);
     else if (current.name === "signin") {

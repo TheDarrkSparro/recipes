@@ -1224,3 +1224,55 @@ h1[tabindex="-1"]:focus, h2[tabindex="-1"]:focus { box-shadow: none; outline: no
   .brand-name { font-size: 0.86rem; }
   .topbar .btn-small svg { display: none; }
 }
+
+/* ---------- Family album (family.js) ---------- */
+
+/* Family photos keep their own shape instead of the stock 3:2 crop. */
+.intro-photo.is-family img { aspect-ratio: auto; }
+.intro-photo-link { display: block; border-radius: var(--radius); }
+.intro-photo-link:hover img { box-shadow: 0 14px 32px rgba(110, 13, 17, 0.26); }
+.intro-photo.is-family figcaption a { color: var(--sage-deep); font-weight: 600; text-underline-offset: 0.2em; }
+
+@media (max-width: 860px) {
+  /* On phones the family photo stays, under the search box. */
+  .intro-photo.is-family { display: block; justify-self: stretch; max-width: 34rem; }
+  .intro-photo.is-family::before { display: none; }
+  .intro-photo.is-family figcaption { text-align: left; }
+}
+
+.album-head { margin-bottom: 1.75rem; }
+.album-title { font-size: clamp(2rem, 4.5vw, 2.9rem); font-weight: 700; }
+.album-sub { margin: 0.6rem 0 0; color: var(--muted); font-size: 1.1rem; max-width: 38rem; }
+
+.album-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 2rem 1.75rem;
+  align-items: start;
+}
+.album-item.is-lead { grid-column: 1 / -1; max-width: 52rem; }
+
+.album-photo { margin: 0; }
+.album-photo a { display: block; border-radius: var(--radius); }
+.album-photo img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  border-bottom: 5px solid var(--saffron);
+  box-shadow: 0 10px 28px rgba(110, 13, 17, 0.16);
+  background: var(--saffron-wash);
+}
+.album-photo a:hover img { box-shadow: 0 14px 32px rgba(110, 13, 17, 0.26); }
+.album-photo figcaption { margin-top: 0.6rem; color: var(--slate); font-size: 0.95rem; }
+
+@media (max-width: 640px) {
+  .nav-link.nav-family { display: none; }
+  .album-grid { gap: 1.5rem; }
+}
+
+@media print {
+  .album-photo a { pointer-events: none; }
+}
