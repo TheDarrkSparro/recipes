@@ -54,6 +54,7 @@ The easier way is **Add a recipe** on the site itself (next section); it needs n
 - Use `null` for `timeMinutes` or `servings` when you do not want them shown.
 - `category` fills the category menu. `tags` are the small labels on each card.
 - Search checks the title, category, tags, ingredients, steps, and notes.
+- Add `hidden: true` to keep a recipe off the public site (see **Hide a recipe** below).
 
 ## Add a recipe from a link (on the site)
 
@@ -105,6 +106,18 @@ While you're signed in, an **Edit** button also appears next to **Print** at the
 Any recipe can be edited this way, including the ones written in `recipes.js`. For those, the edited version is saved in Supabase under the same id and shown instead of the copy in `recipes.js`. That means a later change typed into `recipes.js` won't show for a recipe you've already edited on the site; make further changes to it on the site instead.
 
 **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-editing.sql`, and click **Run**. Until then, saving changes says editing isn't switched on yet.
+
+## Hide a recipe
+
+Hiding takes a recipe off the public site without deleting it: visitors don't see it in the list, in search, in the meal planner, or at its link. Its reviews and edits are kept.
+
+**On the site:** sign in, open the recipe, and click **Hide from site** next to **Edit**. Signed-in contributors still see hidden recipes, greyed out and marked **Hidden from the public**, so they can check or edit them. To publish it again, open it and click **Show on site**. Changes show for visitors the next time they load the page.
+
+**In `recipes.js`:** add `hidden: true` to the recipe (for example, a draft you are still writing), and raise `recipes.js?v=` in `index.html`. Remove the line to publish it. Recipes hidden this way can't be shown from the site's button.
+
+Keep in mind that `recipes.js` is a public file, so anyone who opens it directly can still read a recipe written there, even when it's hidden. Recipes added on the site and then hidden are not sent to visitors at all.
+
+**One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-hiding.sql`, and click **Run**. Until then, the button says hiding isn't switched on yet (`hidden: true` in `recipes.js` works without it). The SQL adds the `hidden_recipes` table (the list of hidden ids, which anyone can read and only contributors can change) and the `contributor_set_recipe_hidden()` and `contributor_hidden_recipes()` functions.
 
 ## Barcelona tile
 

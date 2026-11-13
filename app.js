@@ -18,7 +18,15 @@
   });
   var saved = [];
   var savedState = "loading"; // loading | ready | failed
-  var recipes = local.slice();
+  /* Hidden recipes (see "Hide a recipe" in README.md). hiddenIds comes from
+     Supabase; hiddenSaved holds hidden recipes added on the site, which only
+     signed-in contributors can load. */
+  var hiddenIds = Object.create(null);
+  var hiddenSaved = [];
+  var allRecipes = local.slice();
+  var recipes = local.filter(function (r) {
+    return r.hidden !== true;
+  });
 
   if (window.console && console.warn) {
     if (!recipesLoaded) {
@@ -77,11 +85,25 @@
       copy._builtIn = true;
       return copy;
     });
-    recipes = merged.concat(
-      saved.filter(function (r) {
-        return !localIds[r.id];
-      })
-    );
+    var savedIds = Object.create(null);
+    var extra = saved.concat(hiddenSaved).filter(function (r) {
+      if (localIds[r.id] || savedIds[r.id]) return false;
+      savedIds[r.id] = true;
+      return true;
+    });
+    allRecipes = merged.concat(extra);
+    allRecipes.forEach(function (r) {
+      var id = recipeId(r);
+      r._hiddenInFile = r.hidden === true && !r._saved;
+      r._hidden = r._hiddenInFile || !!(id && hiddenIds[id]);
+    });
+    // Contributors still see hidden recipes (marked Hidden) so they can check
+    // and un-hide them; everyone else never gets them.
+    recipes = signedIn()
+      ? allRecipes
+      : allRecipes.filter(function (r) {
+          return !r._hidden;
+        });
   }
 
   /* Signed in as a contributor (see auth.js). */
@@ -101,12 +123,51 @@
     return true;
   }
 
+  /* The list of hidden recipe ids. Before supabase/add-recipe-hiding.sql has
+     been run the table doesn't exist; then nothing is hidden. */
+  function loadHiddenIds() {
+    return window.Reviews.api("/hidden_recipes?select=id&limit=1000")
+      .then(function (rows) {
+        hiddenIds = Object.create(null);
+        (Array.isArray(rows) ? rows : []).forEach(function (r) {
+          if (r && r.id) hiddenIds[r.id] = true;
+        });
+      })
+      .catch(function () {
+        /* Keep what we had. */
+      });
+  }
+
+  /* Hidden recipes that were added on the site, for signed-in contributors. */
+  function loadHiddenSaved() {
+    if (!signedIn() || !window.Auth.token) {
+      hiddenSaved = [];
+      return Promise.resolve();
+    }
+    return window.Auth.token()
+      .then(function (token) {
+        if (!token) return null;
+        return window.Reviews.api("/rpc/contributor_hidden_recipes", { method: "POST", token: token, body: {} });
+      })
+      .then(function (res) {
+        hiddenSaved = res && res.ok && Array.isArray(res.recipes)
+          ? res.recipes.filter(function (r) {
+              return r && r.id && r.title;
+            }).map(fromRow)
+          : [];
+      })
+      .catch(function () {
+        hiddenSaved = [];
+      });
+  }
+
   function loadSaved() {
     if (!window.Reviews || !window.Reviews.enabled || !window.Reviews.api) {
       savedState = "failed";
       return Promise.resolve();
     }
-    return window.Reviews.api(
+    var extras = Promise.all([loadHiddenIds(), loadHiddenSaved()]);
+    var rows = window.Reviews.api(
       "/recipes?select=id,title,category,tags,time_minutes,servings,image,ingredients,steps,notes,source_url,created_at&order=created_at.desc&limit=500"
     )
       .then(function (rows) {
@@ -114,11 +175,11 @@
           return r && r.id && r.title;
         }).map(fromRow);
         savedState = "ready";
-        rebuild();
       })
       .catch(function () {
         savedState = "failed";
       });
+    return Promise.all([rows, extras]).then(rebuild);
   }
 
   /* ---------- Helpers ---------- */
@@ -261,6 +322,7 @@
   function topIds() {
     var best = Object.create(null);
     recipes.forEach(function (r) {
+      if (r._hidden) return;
       var s = statFor(r);
       if (!s.count || s.avg < BADGE_MIN_AVG) return;
       var c = categoryOf(r);
@@ -331,6 +393,11 @@
   var ICON_PLATE =
     '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
 
+  var ICON_EYE_OFF =
+    '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 10s2.6-5 7-5 7 5 7 5-2.6 5-7 5-7-5-7-5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 16L16 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  var ICON_EYE =
+    '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 10s2.6-5 7-5 7 5 7 5-2.6 5-7 5-7-5-7-5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
+
   function facts(recipe) {
     var time = formatTime(recipe.timeMinutes);
     var serves = formatServings(recipe.servings);
@@ -350,6 +417,7 @@
       '<span class="card-tab">' + esc(cat) + "</span>" +
       '<span class="card-face">' +
       (image ? '<span class="card-photo"><img src="' + esc(image) + '" alt="" loading="lazy"></span>' : "") +
+      (recipe._hidden ? '<span class="hidden-mark">' + ICON_EYE_OFF + "Hidden from the public</span>" : "") +
       (top ? '<span class="top-mark"><span aria-hidden="true">★</span> Top rated</span>' : "") +
       '<span class="card-title">' + esc(titleOf(recipe)) + "</span>" +
       '<span class="card-facts">' +
@@ -357,7 +425,7 @@
       "</span>" +
       (id ? '<span class="card-rating" data-rating-for="' + esc(id) + '" hidden></span>' : "") +
       "</span>";
-    var cls = "card hue-" + hue(cat);
+    var cls = "card hue-" + hue(cat) + (recipe._hidden ? " is-hidden" : "");
     if (!id) return '<li><div class="' + cls + '">' + inner + "</div></li>";
     return '<li><a class="' + cls + '" href="#/recipe/' + encodeURIComponent(id) + '">' + inner + "</a></li>";
   }
@@ -565,9 +633,21 @@
     factItems.push('<div class="fact-box"><dt>Ingredients</dt><dd>' + ingredients.length + "</dd></div>");
     factItems.push('<div class="fact-box fact-rating"><dt>Rating</dt><dd><a href="#reviews" data-jump="reviews" class="card-rating" data-rating-for="' + esc(rid) + '">Not rated yet</a></dd></div>');
 
+    var hiddenNote = "";
+    if (recipe._hiddenInFile) {
+      hiddenNote =
+        '<p class="hidden-note">' + ICON_EYE_OFF +
+        "<span><strong>Hidden from the public.</strong> Only signed-in contributors can see this recipe. It is marked <code>hidden: true</code> in <code>recipes.js</code>; remove that line to publish it.</span></p>";
+    } else if (recipe._hidden) {
+      hiddenNote =
+        '<p class="hidden-note">' + ICON_EYE_OFF +
+        "<span><strong>Hidden from the public.</strong> Only signed-in contributors can see this recipe. Click <strong>Show on site</strong> to publish it again.</span></p>";
+    }
+
     app.innerHTML =
       '<article class="recipe hue-' + hue(cat) + '">' +
       '<a class="back" href="#/">' + backArrow() + "All recipes</a>" +
+      hiddenNote +
       '<header class="recipe-head">' +
       '<p class="recipe-cat"><span class="card-tab">' + esc(cat) + "</span></p>" +
       '<h1 class="recipe-title" tabindex="-1">' + esc(title) + "</h1>" +
@@ -583,9 +663,15 @@
       (signedIn()
         ? '<a class="btn btn-quiet" href="#/edit/' + esc(encodeURIComponent(rid)) + '">' +
           '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M12.8 4.2l3 3L7.5 15.5l-3.7.7.7-3.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
-          "Edit</a>"
+          "Edit</a>" +
+          (recipe._hiddenInFile
+            ? ""
+            : '<button type="button" class="btn btn-quiet" data-visibility="' + (recipe._hidden ? "show" : "hide") + '">' +
+              (recipe._hidden ? ICON_EYE + "Show on site" : ICON_EYE_OFF + "Hide from site") +
+              "</button>")
         : "") +
       "</div>" +
+      '<p class="visibility-msg" id="visibility-msg" role="status" hidden></p>' +
       "</header>" +
       (image ? '<figure class="photo"><img src="' + esc(image) + '" alt=""></figure>' : "") +
       '<div class="recipe-body">' +
@@ -677,6 +763,8 @@
           t.setAttribute("aria-pressed", "true");
           t.parentNode.classList.add("is-current");
         }
+      } else if (t.hasAttribute("data-visibility")) {
+        setHidden(rid, t.getAttribute("data-visibility") === "hide", t);
       } else if (t.hasAttribute("data-jump")) {
         e.preventDefault();
         var target = document.getElementById(t.getAttribute("data-jump"));
@@ -702,6 +790,82 @@
     } else if (reviewsSection) {
       reviewsSection.remove();
     }
+  }
+
+  /* ---------- Hide or show a recipe ---------- */
+
+  var VISIBILITY_ERRORS = {
+    not_signed_in: "Your sign-in has ended. Sign in again, then try once more.",
+    not_contributor: "This account can’t hide or show recipes.",
+    not_set_up: "Hiding recipes isn’t switched on yet. In Supabase, run supabase/add-recipe-hiding.sql (see README.md).",
+    network: "Couldn’t reach the recipe database. Check your connection and try again.",
+    failed: "That didn’t save. Refresh the page and try again."
+  };
+
+  function setHidden(id, hide, button) {
+    var msg = document.getElementById("visibility-msg");
+    function say(text) {
+      if (!msg) return;
+      msg.textContent = text;
+      msg.hidden = !text;
+    }
+    if (!id || !window.Auth || !window.Reviews || !window.Reviews.api) {
+      say(VISIBILITY_ERRORS.failed);
+      return;
+    }
+    button.disabled = true;
+    say(hide ? "Hiding…" : "Publishing…");
+    window.Auth.token()
+      .then(function (token) {
+        if (!token) {
+          var e = new Error("not_signed_in");
+          e.key = "not_signed_in";
+          throw e;
+        }
+        return window.Reviews.api("/rpc/contributor_set_recipe_hidden", {
+          method: "POST",
+          token: token,
+          body: { p_id: id, p_hidden: hide }
+        });
+      })
+      .then(function (res) {
+        if (!res || !res.ok) {
+          var e = new Error((res && res.error) || "failed");
+          e.key = res && res.error;
+          throw e;
+        }
+        if (hide) hiddenIds[id] = true;
+        else delete hiddenIds[id];
+        // A hidden recipe added on the site is no longer in the public list,
+        // so keep a copy for this contributor.
+        var r = findRecipe(id);
+        if (hide && r && r._saved && !r._builtIn) {
+          saved = saved.filter(function (x) {
+            return x.id !== id;
+          });
+          hiddenSaved = hiddenSaved.filter(function (x) {
+            return x.id !== id;
+          });
+          hiddenSaved.push(r);
+        }
+        rebuild();
+        renderDetail(id);
+        var m = document.getElementById("visibility-msg");
+        if (m) {
+          m.textContent = hide
+            ? "Hidden. Visitors no longer see this recipe in the list, in search, or at its link."
+            : "Published. Everyone can see this recipe again.";
+          m.hidden = false;
+        }
+      })
+      .catch(function (err) {
+        var key = (err && err.key) || "";
+        if (!key && err && err.kind === "network") key = "network";
+        if (!key && err && err.kind === "server" && (err.status === 404 || err.code === "PGRST202")) key = "not_set_up";
+        if (!key && err && err.kind === "server" && (err.status === 401 || err.status === 403)) key = "not_signed_in";
+        button.disabled = false;
+        say(VISIBILITY_ERRORS[key] || VISIBILITY_ERRORS.failed);
+      });
   }
 
   function backArrow() {
@@ -965,10 +1129,30 @@
   );
 
   window.addEventListener("hashchange", route);
+  rebuild();
   route();
 
+  /* Signing in or out changes whether hidden recipes are shown. */
+  if (window.Auth && window.Auth.onChange) {
+    var wasSignedIn = signedIn();
+    window.Auth.onChange(function () {
+      var now = signedIn();
+      if (now === wasSignedIn) return;
+      wasSignedIn = now;
+      loadHiddenSaved().then(function () {
+        rebuild();
+        if (current.name === "list") {
+          paintTabs();
+          paintResults();
+        } else if (current.name === "detail") {
+          renderDetail(current.id);
+        }
+      });
+    });
+  }
+
   loadSaved().then(function () {
-    if (current.name === "list" && saved.length) {
+    if (current.name === "list") {
       paintTabs();
       paintResults();
     } else if (current.name === "detail") {

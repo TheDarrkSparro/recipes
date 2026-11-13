@@ -462,6 +462,38 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 }
 .top-mark span { color: var(--saffron); }
 
+/* Hidden recipes (only contributors see them) */
+.hidden-mark {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: #ece8e1;
+  color: var(--slate);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.card.is-hidden .card-face { opacity: 0.72; }
+.card.is-hidden .card-photo img { filter: grayscale(0.7); }
+.hidden-note {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 1rem 0 1.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--muted);
+  border-radius: var(--radius);
+  background: #f3efe8;
+  color: var(--slate);
+  font-size: 0.95rem;
+}
+.hidden-note .i { flex: 0 0 auto; margin-top: 0.15rem; }
+.visibility-msg { margin: 0.6rem 0 0; color: var(--slate); font-size: 0.92rem; }
+.visibility-msg[hidden] { display: none; }
+.recipe-actions { flex-wrap: wrap; }
+
 .card-rating { display: flex; align-items: center; gap: 0.35rem; font-size: 0.92rem; }
 .card-rating[hidden] { display: none; }
 
@@ -1190,7 +1222,7 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 
 @media print {
   body { background: #fff; font-size: 11pt; }
-  .topbar, .footer, .back, .recipe-actions, .reviews, .hint, .link-btn, .tags, .skip, .owner-edit { display: none !important; }
+  .topbar, .footer, .back, .recipe-actions, .reviews, .hint, .link-btn, .tags, .skip, .owner-edit, .hidden-note, .visibility-msg { display: none !important; }
   .page { padding: 0; max-width: none; }
   .recipe-body { grid-template-columns: 1fr 1.6fr; gap: 1.5rem; }
   .ingredients-box { position: static; border: 0; padding: 0; }
