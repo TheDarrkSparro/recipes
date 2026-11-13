@@ -549,6 +549,7 @@
         }
         var text = READ_ERRORS[key] || SAVE_ERRORS[key] || READ_ERRORS.network;
         if (key === "not_set_up" && data && READ_MISSING[data.missing]) text = READ_MISSING[data.missing];
+        if (data && typeof data.detail === "string" && data.detail) text += " (Details: " + data.detail + ")";
         setMsg(readMsg, text, "error");
       });
     });
