@@ -96,6 +96,16 @@ Each read costs a little on your Claude API account: a few cents at most with th
 
 Until steps 1–3 are done, the form says reading photos isn't switched on yet. Everything else keeps working.
 
+## Edit a recipe (on the site)
+
+Open the recipe and click **Edit this recipe** at the bottom of the page. The form opens already filled in. Change anything, including the photo (upload a new one, or click **Remove photo**). Enter your owner code and click **Save changes**. Visitors see the changes the next time they open the recipe.
+
+If you tick **Remember the code on this device** when saving, an **Edit** button also appears next to **Print** at the top of every recipe on that device.
+
+Any recipe can be edited this way, including the ones written in `recipes.js`. For those, the edited version is saved in Supabase under the same id and shown instead of the copy in `recipes.js`. That means a later change typed into `recipes.js` won't show for a recipe you've already edited on the site; make further changes to it on the site instead.
+
+**One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-editing.sql`, and click **Run**. Until then, saving changes says editing isn't switched on yet.
+
 ## Hosting on Cloudflare
 
 The site is served by **Cloudflare Workers**: the files are served as they are, and one small Worker script handles `/api/import`. These files control it:
@@ -106,7 +116,7 @@ The site is served by **Cloudflare Workers**: the files are served as they are, 
 | `.assetsignore` | Keeps `README.md`, `wrangler.jsonc`, `.gitignore` and other behind-the-scenes files off the public site. |
 | `_headers` | Adds security headers. It lists the only outside sites the page may use: Google Fonts and the Supabase reviews project. |
 | `worker/` | The small Cloudflare Worker behind **Add a recipe** (reads recipe links and recipe photos). Not published as files. |
-| `supabase/` | The SQL for saved recipes, photo uploads, and photo reading. Run each file once in Supabase. Not published. |
+| `supabase/` | The SQL for saved recipes, editing, photo uploads, and photo reading. Run each file once in Supabase. Not published. |
 | `_redirects` | Sends old `/recipes/...` links (from the GitHub Pages days) to the right page. |
 | `docs/` | A "we've moved" page for the old GitHub Pages address. Not published on Cloudflare. |
 

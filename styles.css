@@ -500,6 +500,14 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 .fact-box a.card-rating:hover { text-decoration: underline; }
 
 .recipe-actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
+.recipe-actions .btn { text-decoration: none; }
+
+.owner-edit { margin: 2rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.owner-edit a { color: var(--sage-deep); font-weight: 600; text-underline-offset: 0.2em; }
+.owner-edit a:hover { color: var(--ink); }
+
+.recipe-form.is-edit { margin-top: 1.5rem; }
+.form-foot .link-btn { margin-left: 0.75rem; text-decoration: underline; }
 
 .photo { margin: 1.75rem 0 0; }
 .photo img { width: 100%; max-height: 30rem; object-fit: cover; border-radius: var(--radius); }
@@ -879,7 +887,7 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 
 @media print {
   body { background: #fff; font-size: 11pt; }
-  .topbar, .footer, .back, .recipe-actions, .reviews, .hint, .link-btn, .tags, .skip { display: none !important; }
+  .topbar, .footer, .back, .recipe-actions, .reviews, .hint, .link-btn, .tags, .skip, .owner-edit { display: none !important; }
   .page { padding: 0; max-width: none; }
   .recipe-body { grid-template-columns: 1fr 1.6fr; gap: 1.5rem; }
   .ingredients-box { position: static; border: 0; padding: 0; }

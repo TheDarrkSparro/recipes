@@ -4,6 +4,9 @@
  * card or cookbook page (through /api/read-photo, owner code only), or type
  * one in. Saving needs the
  * owner code, which is checked by the database (see supabase/add-recipes-table.sql).
+ *
+ * The same form edits a recipe (AddRecipe.mount with ctx.edit set), saving
+ * through update_recipe (see supabase/add-recipe-editing.sql).
  */
 (function () {
   "use strict";
@@ -92,6 +95,7 @@
     wrong_code: "That owner code isn’t right. Check it and try again.",
     too_many_attempts: "Too many wrong codes were tried, so saving is paused for 10 minutes.",
     missing_title: "Give the recipe a title.",
+    not_set_up: "Editing isn’t switched on yet. Run supabase/add-recipe-editing.sql in the Supabase SQL Editor (see “Edit a recipe” in README.md).",
     invalid_input: "Something is too long or not in the right form. Photo links must start with https://, and steps can be up to about 40,000 characters in all.",
     network: "Couldn’t reach the recipe database. Check your connection and try again."
   };
@@ -122,12 +126,21 @@
       taken[id] = true;
     });
     var savedCode = readCode();
+    var editing = ctx.edit || null;
+    var backIcon = '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.5 5L6.5 10l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var saveLabel = editing ? "Save changes" : "Save recipe";
 
     root.innerHTML =
       '<section class="add">' +
-      '<a class="back" href="#/"><svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.5 5L6.5 10l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>All recipes</a>' +
-      '<h1 class="add-title">Add a recipe</h1>' +
-      '<p class="add-sub">Paste a link to a recipe page, or take a photo of a recipe card or cookbook page, and the details fill in for you to check. Or type a family recipe in by hand. You can add a photo of the dish on the next step.</p>' +
+      (editing
+        ? '<a class="back" href="#/recipe/' + esc(encodeURIComponent(editing.id)) + '">' + backIcon + "Back to the recipe</a>" +
+          '<h1 class="add-title">Edit recipe</h1>' +
+          '<p class="add-sub">Change anything below, then save. Visitors see the changes as soon as they open the recipe.</p>'
+        : '<a class="back" href="#/">' + backIcon + "All recipes</a>" +
+          '<h1 class="add-title">Add a recipe</h1>' +
+          '<p class="add-sub">Paste a link to a recipe page, or take a photo of a recipe card or cookbook page, and the details fill in for you to check. Or type a family recipe in by hand. You can add a photo of the dish on the next step.</p>') +
+
+      (editing ? "" :
 
       '<form class="link-form" id="link-form" novalidate>' +
       '<label class="field-label" for="link">Recipe link</label>' +
@@ -155,10 +168,12 @@
       '<button class="btn" type="submit" id="read-btn">Read recipe</button>' +
       "</div>" +
       '<p class="form-msg" id="read-msg" role="status" aria-live="polite"></p>' +
-      "</form>" +
+      "</form>") +
 
-      '<form class="recipe-form" id="recipe-form" novalidate hidden>' +
-      '<div class="form-head"><h2>Check the details</h2><p class="muted">Change anything you like before saving. One ingredient or step per line.</p></div>' +
+      '<form class="recipe-form' + (editing ? " is-edit" : "") + '" id="recipe-form" novalidate' + (editing ? "" : " hidden") + ">" +
+      (editing
+        ? '<div class="form-head"><p class="muted">One ingredient or step per line.</p></div>'
+        : '<div class="form-head"><h2>Check the details</h2><p class="muted">Change anything you like before saving. One ingredient or step per line.</p></div>') +
       '<div class="grid-2">' +
       field("Title", '<input name="title" required maxlength="200">', "wide") +
       '<div class="field field-wide photo-field">' +
@@ -190,11 +205,12 @@
         "Where the recipe came from. Shown as “Adapted from” on the recipe page.") +
       "</div>" +
       '<div class="save-row">' +
-      field("Owner code", '<input name="code" type="password" autocomplete="off" maxlength="100" required value="' + esc(savedCode) + '">', "", "Only you can save recipes.") +
+      field("Owner code", '<input name="code" type="password" autocomplete="off" maxlength="100" required value="' + esc(savedCode) + '">', "", editing ? "Only you can change recipes." : "Only you can save recipes.") +
       '<label class="check"><input type="checkbox" name="keep"' + (savedCode ? " checked" : "") + "> Remember the code on this device</label>" +
       "</div>" +
       '<div class="form-foot">' +
-      '<button class="btn" type="submit" id="save-btn">Save recipe</button>' +
+      '<button class="btn" type="submit" id="save-btn">' + saveLabel + "</button>" +
+      (editing ? '<a class="link-btn" href="#/recipe/' + esc(encodeURIComponent(editing.id)) + '">Cancel</a>' : "") +
       '<p class="form-msg" id="save-msg" role="status" aria-live="polite"></p>' +
       "</div>" +
       "</form>" +
@@ -246,6 +262,7 @@
 
     photoRemove.addEventListener("click", function () {
       clearPhoto();
+      if (editing) form.elements.image.value = "";
       photoInput.focus();
     });
 
@@ -302,12 +319,12 @@
       }
     }
 
-    root.querySelector("#manual").addEventListener("click", function () {
+    if (!editing) root.querySelector("#manual").addEventListener("click", function () {
       setMsg(linkMsg, "", "");
       showForm({}, "", true);
     });
 
-    linkForm.addEventListener("submit", function (e) {
+    if (!editing) linkForm.addEventListener("submit", function (e) {
       e.preventDefault();
       if (linkBtn.disabled) return;
       var url = linkInput.value.trim();
@@ -377,10 +394,10 @@
         return;
       }
 
-      var id = slug(title);
+      var id = editing ? editing.id : slug(title);
       var base = id;
       var n = 1;
-      while (taken[id]) {
+      while (!editing && taken[id]) {
         n += 1;
         id = base + "-" + n;
       }
@@ -413,6 +430,9 @@
             recipe.image = url;
             saveBtn.textContent = "Saving…";
           }
+          if (editing) {
+            return window.Reviews.api("/rpc/update_recipe", { method: "POST", body: { p_code: code, p_id: id, p_recipe: recipe } });
+          }
           return window.Reviews.api("/rpc/add_recipe", { method: "POST", body: { p_code: code, p_recipe: recipe } });
         })
         .then(function (data) {
@@ -424,12 +444,14 @@
           storeCode(code, el.keep.checked);
           recipe.id = data.id || recipe.id;
           recipe._saved = true;
-          recipe._added = new Date().toISOString();
-          setMsg(saveMsg, "Saved.", "ok");
+          recipe._added = editing ? editing._added || "" : new Date().toISOString();
+          setMsg(saveMsg, editing ? "Changes saved." : "Saved.", "ok");
           if (ctx.onSaved) ctx.onSaved(recipe);
         })
         .catch(function (err) {
           var key = err && err.kind === "network" ? "network" : (err && err.message) || "";
+          // update_recipe missing from Supabase: the editing SQL hasn't been run.
+          if (editing && err && err.kind === "server" && (err.status === 404 || /update_recipe/.test(key))) key = "not_set_up";
           if (key === "wrong_code") {
             storeCode("", false);
             el.code.value = "";
@@ -443,9 +465,20 @@
         })
         .then(function () {
           saveBtn.disabled = false;
-          saveBtn.textContent = "Save recipe";
+          saveBtn.textContent = saveLabel;
         });
     });
+
+    if (editing) {
+      fill(editing, editing.source || "");
+      if (editing.image) {
+        form.elements.image.value = editing.image;
+        photoPreview.src = editing.image;
+        photoPreview.hidden = false;
+        photoRemove.hidden = false;
+      }
+      return;
+    }
 
     /* ---------- Read a recipe from a photo ---------- */
 

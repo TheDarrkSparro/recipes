@@ -51,16 +51,45 @@
     };
   }
 
+  /* A recipe saved on the site with the same id as one in recipes.js is an
+     edited version of it (see "Edit a recipe" in README.md), so it replaces
+     that one but keeps its place in the list. */
   function rebuild() {
-    var ids = Object.create(null);
-    local.forEach(function (r) {
-      ids[recipeId(r)] = true;
+    var byId = Object.create(null);
+    saved.forEach(function (r) {
+      byId[r.id] = r;
     });
-    recipes = local.concat(
+    var localIds = Object.create(null);
+    var merged = local.map(function (r) {
+      var id = recipeId(r);
+      localIds[id] = true;
+      var edit = byId[id];
+      if (!edit) return r;
+      var copy = {};
+      Object.keys(r).forEach(function (k) {
+        copy[k] = r[k];
+      });
+      Object.keys(edit).forEach(function (k) {
+        copy[k] = edit[k];
+      });
+      copy._order = r._order;
+      copy._added = "";
+      copy._builtIn = true;
+      return copy;
+    });
+    recipes = merged.concat(
       saved.filter(function (r) {
-        return !ids[r.id];
+        return !localIds[r.id];
       })
     );
+  }
+
+  function ownerCodeRemembered() {
+    try {
+      return !!localStorage.getItem("dse-owner-code");
+    } catch (e) {
+      return false;
+    }
   }
 
   function loadSaved() {
@@ -493,8 +522,11 @@
     return null;
   }
 
+  var shownRecipe = null;
+
   function renderDetail(id) {
     var recipe = findRecipe(id);
+    shownRecipe = recipe;
 
     if (!recipe) {
       if (savedState === "loading") {
@@ -541,6 +573,11 @@
       '<button type="button" class="btn btn-quiet" data-print="1">' +
       '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5.5 7V3h9v4M5.5 14h-2V8.5a1.5 1.5 0 0 1 1.5-1.5h10a1.5 1.5 0 0 1 1.5 1.5V14h-2M5.5 11.5h9V17h-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
       "Print</button>" +
+      (ownerCodeRemembered()
+        ? '<a class="btn btn-quiet" href="#/edit/' + esc(encodeURIComponent(rid)) + '">' +
+          '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M12.8 4.2l3 3L7.5 15.5l-3.7.7.7-3.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
+          "Edit</a>"
+        : "") +
       "</div>" +
       "</header>" +
       (image ? '<figure class="photo"><img src="' + esc(image) + '" alt=""></figure>' : "") +
@@ -579,6 +616,7 @@
         : "") +
       "</section>" +
       "</div>" +
+      '<p class="owner-edit"><a href="#/edit/' + esc(encodeURIComponent(rid)) + '">Edit this recipe</a> (owner code needed)</p>' +
       '<section class="reviews" id="reviews"></section>' +
       "</article>";
 
@@ -681,6 +719,64 @@
     });
   }
 
+  /* ---------- Edit a recipe ---------- */
+
+  function renderEdit(id) {
+    var recipe = findRecipe(id);
+    // Wait for the saved recipes, so an earlier edit isn't overwritten by the
+    // version in recipes.js.
+    if (savedState === "loading") {
+      app.innerHTML = '<p class="loading">Opening the recipe…</p>';
+      return;
+    }
+    if (!recipe) {
+      document.title = "Recipe not found · The Dark Sparrow Eats";
+      app.innerHTML =
+        '<a class="back" href="#/">' + backArrow() + "All recipes</a>" +
+        emptyBlock("That recipe isn't here", "The link may be old, or the recipe was renamed.", '<a class="btn" href="#/">See all recipes</a>');
+      return;
+    }
+    if (savedState === "failed" || !window.AddRecipe) {
+      app.innerHTML =
+        '<a class="back" href="#/recipe/' + esc(encodeURIComponent(id)) + '">' + backArrow() + "Back to the recipe</a>" +
+        emptyBlock("Editing isn't available right now", "The recipe database couldn't be reached. Check your connection, then refresh the page.");
+      return;
+    }
+    document.title = "Edit " + titleOf(recipe) + " · The Dark Sparrow Eats";
+    var cats = categories()
+      .map(function (c) {
+        return c.name;
+      })
+      .filter(function (n) {
+        return n !== "Other";
+      });
+    window.AddRecipe.mount(app, {
+      categories: cats,
+      edit: {
+        id: recipeId(recipe),
+        title: titleOf(recipe),
+        category: str(recipe.category),
+        tags: stringList(recipe.tags),
+        timeMinutes: Number(recipe.timeMinutes) > 0 ? Number(recipe.timeMinutes) : "",
+        servings: recipe.servings == null ? "" : String(recipe.servings),
+        image: safeSrc(recipe.image) || "",
+        ingredients: stringList(recipe.ingredients),
+        steps: stringList(recipe.steps),
+        notes: str(recipe.notes),
+        source: safeLink(recipe.source) || "",
+        _added: recipe._builtIn ? "" : recipe._added || ""
+      },
+      onSaved: function (updated) {
+        saved = saved.filter(function (r) {
+          return r.id !== updated.id;
+        });
+        saved.push(updated);
+        rebuild();
+        location.hash = "#/recipe/" + encodeURIComponent(updated.id);
+      }
+    });
+  }
+
   /* ---------- Routing ---------- */
 
   var current = { name: "list" };
@@ -696,6 +792,8 @@
     if (/^\/?add\/?$/.test(hash)) return { name: "add" };
     var match = hash.match(/^\/?recipe\/([^/]+)\/?$/);
     if (match) return { name: "detail", id: match[1] };
+    var edit = hash.match(/^\/?edit\/([^/]+)\/?$/);
+    if (edit) return { name: "edit", id: edit[1] };
     return { name: "list" };
   }
 
@@ -714,6 +812,7 @@
     markNav();
     if (current.name === "detail") renderDetail(current.id);
     else if (current.name === "add") renderAdd();
+    else if (current.name === "edit") renderEdit(current.id);
     else renderList();
     window.scrollTo(0, 0);
     if (prev !== current.name || current.name === "detail") {
@@ -743,8 +842,11 @@
     if (current.name === "list" && saved.length) {
       paintTabs();
       paintResults();
-    } else if (current.name === "detail" && !app.querySelector(".recipe")) {
-      renderDetail(current.id);
+    } else if (current.name === "detail") {
+      // Re-draw in case this recipe has an edited version.
+      if (!app.querySelector(".recipe") || findRecipe(current.id) !== shownRecipe) renderDetail(current.id);
+    } else if (current.name === "edit") {
+      renderEdit(current.id);
     }
   });
 })();
