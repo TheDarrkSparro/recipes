@@ -2,9 +2,10 @@
  * /api/read-photo: reads a recipe from photos of a recipe card or cookbook
  * page, for the "Add a recipe" page.
  *
- * 1. Checks the owner code with Supabase (public.photo_read_ticket, see
- *    supabase/add-photo-reading.sql). Without the right code nothing is sent
- *    to Claude, so nobody else can use (or run up the bill on) the reader.
+ * 1. Checks the contributor's sign-in with Supabase
+ *    (public.contributor_photo_read_ticket, see supabase/add-accounts.sql).
+ *    Without an invited contributor's sign-in nothing is sent to Claude, so
+ *    nobody else can use (or run up the bill on) the reader.
  * 2. Sends the photos to the Claude API, which returns the recipe as fields.
  * 3. Hands the fields back to the form for you to check. Nothing is saved here.
  *
@@ -110,14 +111,21 @@ export function readImage(value) {
   return { type: "image", source: { type: "base64", media_type: mediaType, data } };
 }
 
-async function checkOwner(env, code) {
+/* The browser sends the contributor's Supabase sign-in token; Supabase checks
+   it (and the invite) inside contributor_photo_read_ticket. */
+async function checkContributor(env, token) {
   const base = String(env.SUPABASE_URL || "").replace(/\/+$/, "");
   let res;
   try {
-    res = await fetch(base + "/rest/v1/rpc/photo_read_ticket", {
+    res = await fetch(base + "/rest/v1/rpc/contributor_photo_read_ticket", {
       method: "POST",
-      headers: { apikey: env.SUPABASE_KEY, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ p_code: code }),
+      headers: {
+        apikey: env.SUPABASE_KEY,
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: "{}",
       signal: AbortSignal.timeout(10000)
     });
   } catch (e) {
@@ -129,8 +137,10 @@ async function checkOwner(env, code) {
   } catch (e) {
     data = null;
   }
-  // A missing function means supabase/add-photo-reading.sql hasn't been run.
+  // A missing function means supabase/add-accounts.sql hasn't been run.
   if (res.status === 404 || (data && data.code === "PGRST202")) return "not_set_up";
+  // An expired or bad token, or a visitor who isn't signed in.
+  if (res.status === 401 || res.status === 403) return "not_signed_in";
   if (!res.ok || !data) return "check_failed";
   if (data.ok === true) return "ok";
   return typeof data.error === "string" ? data.error : "check_failed";
@@ -255,8 +265,9 @@ export async function handleReadPhoto(request, env) {
   } catch (e) {
     return json({ ok: false, error: "bad_request" }, 400);
   }
-  const code = typeof (body && body.code) === "string" ? body.code.trim() : "";
-  if (!code || code.length > 100) return json({ ok: false, error: "wrong_code" }, 400);
+  const auth = request.headers.get("authorization") || "";
+  const token = /^Bearer\s+([A-Za-z0-9._-]{20,4096})$/.exec(auth.trim());
+  if (!token) return json({ ok: false, error: "not_signed_in" }, 401);
   const raw = Array.isArray(body.images) ? body.images : [];
   if (!raw.length) return json({ ok: false, error: "no_photo" }, 400);
   if (raw.length > MAX_IMAGES) return json({ ok: false, error: "too_many_photos" }, 400);
@@ -264,15 +275,15 @@ export async function handleReadPhoto(request, env) {
   if (images.some((img) => !img)) return json({ ok: false, error: "too_big" }, 400);
   const categories = list(body.categories, 30, 60);
 
-  const check = await checkOwner(env, code);
+  const check = await checkContributor(env, token[1]);
   if (check === "not_set_up") return json({ ok: false, error: "not_set_up", missing: "database" }, 503);
   if (check !== "ok") {
-    const status = check === "wrong_code" ? 403 : check === "too_many_attempts" || check === "daily_limit" ? 429 : 503;
+    const status = check === "not_signed_in" ? 401 : check === "not_contributor" ? 403 : check === "daily_limit" ? 429 : 503;
     return json({ ok: false, error: check }, status);
   }
 
   const answer = await askClaude(env, images, categories);
-  // The details are only shown to someone who passed the owner-code check.
+  // The details are only shown to a signed-in contributor (checked above).
   if (answer.error) return json({ ok: false, error: answer.error, detail: answer.detail || "" }, 502);
   if (answer.input.is_recipe === false) return json({ ok: false, error: "not_a_recipe" }, 422);
 

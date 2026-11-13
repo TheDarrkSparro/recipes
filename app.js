@@ -84,12 +84,21 @@
     );
   }
 
-  function ownerCodeRemembered() {
-    try {
-      return !!localStorage.getItem("dse-owner-code");
-    } catch (e) {
-      return false;
+  /* Signed in as a contributor (see auth.js). */
+  function signedIn() {
+    return !!(window.Auth && window.Auth.signedIn());
+  }
+
+  /* Adding and editing need a contributor sign-in; returns true when the
+     sign-in page was shown instead. */
+  function needSignIn(next, reason) {
+    if (signedIn()) return false;
+    if (!window.Auth) {
+      app.innerHTML = emptyBlock("Sign-in isn't available", "The sign-in script didn't load. Refresh the page and try again.");
+      return true;
     }
+    window.Auth.renderSignIn(app, { next: next, reason: reason });
+    return true;
   }
 
   function loadSaved() {
@@ -573,7 +582,7 @@
       '<button type="button" class="btn btn-quiet" data-print="1">' +
       '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5.5 7V3h9v4M5.5 14h-2V8.5a1.5 1.5 0 0 1 1.5-1.5h10a1.5 1.5 0 0 1 1.5 1.5V14h-2M5.5 11.5h9V17h-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
       "Print</button>" +
-      (ownerCodeRemembered()
+      (signedIn()
         ? '<a class="btn btn-quiet" href="#/edit/' + esc(encodeURIComponent(rid)) + '">' +
           '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M12.8 4.2l3 3L7.5 15.5l-3.7.7.7-3.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
           "Edit</a>"
@@ -616,7 +625,7 @@
         : "") +
       "</section>" +
       "</div>" +
-      '<p class="owner-edit"><a href="#/edit/' + esc(encodeURIComponent(rid)) + '">Edit this recipe</a> (owner code needed)</p>' +
+      '<p class="owner-edit"><a href="#/edit/' + esc(encodeURIComponent(rid)) + '">Edit this recipe</a> (contributors only)</p>' +
       '<section class="reviews" id="reviews"></section>' +
       "</article>";
 
@@ -698,6 +707,7 @@
 
   function renderAdd() {
     document.title = "Add a recipe · The Dark Sparrow Eats";
+    if (needSignIn("#/add", "Reading recipes needs no account. To add a recipe, sign in with the account you were invited to.")) return;
     if (!window.AddRecipe) {
       app.innerHTML = emptyBlock("Adding recipes isn't available", "The add-recipe script didn't load. Refresh the page and try again.");
       return;
@@ -742,6 +752,7 @@
         emptyBlock("Editing isn't available right now", "The recipe database couldn't be reached. Check your connection, then refresh the page.");
       return;
     }
+    if (needSignIn("#/edit/" + encodeURIComponent(id), "To edit “" + titleOf(recipe) + "”, sign in with the account you were invited to.")) return;
     document.title = "Edit " + titleOf(recipe) + " · The Dark Sparrow Eats";
     var cats = categories()
       .map(function (c) {
@@ -790,6 +801,8 @@
       /* Keep the raw hash if it is not valid encoding. */
     }
     if (/^\/?add\/?$/.test(hash)) return { name: "add" };
+    if (/^\/?signin\/?$/.test(hash)) return { name: "signin" };
+    if (/^\/?set-password\/?$/.test(hash)) return { name: "set-password" };
     var match = hash.match(/^\/?recipe\/([^/]+)\/?$/);
     if (match) return { name: "detail", id: match[1] };
     var edit = hash.match(/^\/?edit\/([^/]+)\/?$/);
@@ -813,7 +826,13 @@
     if (current.name === "detail") renderDetail(current.id);
     else if (current.name === "add") renderAdd();
     else if (current.name === "edit") renderEdit(current.id);
-    else renderList();
+    else if (current.name === "signin") {
+      if (window.Auth) window.Auth.renderSignIn(app, { next: "#/add" });
+      else renderList();
+    } else if (current.name === "set-password") {
+      if (window.Auth) window.Auth.renderSetPassword(app);
+      else renderList();
+    } else renderList();
     window.scrollTo(0, 0);
     if (prev !== current.name || current.name === "detail") {
       var h = app.querySelector("h1");

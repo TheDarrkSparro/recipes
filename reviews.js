@@ -35,6 +35,8 @@
     var headers = { apikey: key, Accept: "application/json" };
     if (options.body) headers["Content-Type"] = "application/json";
     if (options.prefer) headers.Prefer = options.prefer;
+    // A signed-in contributor's token (see auth.js); without it the request is anonymous.
+    if (options.token) headers.Authorization = "Bearer " + options.token;
     return fetch(base + path, {
       method: options.method || "GET",
       headers: headers,

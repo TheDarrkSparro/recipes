@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=15">
+  <link rel="stylesheet" href="/styles.css?v=16">
 </head>
 <body class="guide-body">
   <a class="skip" href="#guide">Skip to the guide</a>
@@ -39,18 +39,32 @@
     <header class="guide-head">
       <p class="guide-kicker">Contributor guide</p>
       <h1>How to add and edit recipes</h1>
-      <p class="guide-lead">Thanks for helping fill the recipe box! You can add recipes and fix them later, right from this website, on a phone or a computer. You don’t need an account.</p>
+      <p class="guide-lead">Thanks for helping fill the recipe box! You can add recipes and fix them later, right from this website, on a phone or a computer. Reading recipes needs no account; adding and editing need one, and Art sets yours up.</p>
     </header>
 
     <aside class="guide-need" aria-labelledby="need-title">
       <h2 id="need-title">What you need</h2>
       <ul>
         <li><strong>This website.</strong> Bookmark it: <a href="/">recipes.the-dark-sparro.workers.dev</a></li>
-        <li><strong>The owner code.</strong> A short password Art will send you separately. You need it each time you save. Please don’t share it or post it anywhere.</li>
+        <li><strong>An invitation email.</strong> Art invites you by email. Click the link in it and choose a password. That’s your account; please don’t share the password.</li>
       </ul>
     </aside>
 
-    <p>Everything starts from the <strong>Add a recipe</strong> button at the top right of every page. On a phone it just says <strong>Add</strong>.</p>
+    <section id="sign-in" class="guide-section">
+      <h2>Set up your account and sign in</h2>
+      <ol class="guide-steps">
+        <li>Open the invitation email from The Dark Sparrow Eats and click its link. (Check your spam folder if it isn’t in your inbox. The link works once and expires after a day or so; if it’s too late, ask Art to send another.)</li>
+        <li>The site opens and says <strong>Welcome</strong>. Choose a password of at least 8 characters, type it twice, and click <strong>Save password</strong>. You’re now signed in.</li>
+        <li>Next time, click <strong>Add a recipe</strong> or <strong>Edit this recipe</strong> and the site asks you to sign in with your email and password. Each phone or computer remembers you until you sign out.</li>
+      </ol>
+      <figure class="guide-fig guide-fig-narrow">
+        <img src="img/sign-in.webp" width="1000" height="638" loading="lazy" alt="The Contributor sign in page with an email and password filled in and the Sign in button outlined">
+        <figcaption>Sign in with the email Art invited and your password.</figcaption>
+      </figure>
+      <p class="guide-tip"><strong>Forgot your password?</strong> On the sign-in page, click <strong>Forgot your password?</strong>, enter your email, and click <strong>Email me a reset link</strong>. The link in that email lets you choose a new password.</p>
+    </section>
+
+    <p class="guide-after-signin">Once you’re signed in, everything starts from the <strong>Add a recipe</strong> button at the top right of every page. On a phone it just says <strong>Add</strong>.</p>
     <figure class="guide-fig guide-fig-wide">
       <img src="img/header.webp" width="1400" height="82" alt="The red bar at the top of the site, with the Add a recipe button outlined in gold">
     </figure>
@@ -69,7 +83,7 @@
         <li>Open the recipe on that website and copy the address from your browser’s address bar. It starts with https://.</li>
         <li>On this site, click <strong>Add a recipe</strong>, paste the address into <strong>Recipe link</strong>, and click <strong>Get recipe</strong>.</li>
         <li>The form below fills in with the title, ingredients, and steps. Check them, and fix anything that came in wrong.</li>
-        <li>Enter the owner code and click <strong>Save recipe</strong>.</li>
+        <li>Click <strong>Save recipe</strong>.</li>
       </ol>
       <figure class="guide-fig">
         <img src="img/link-box.webp" width="1100" height="583" loading="lazy" alt="The Add a recipe page with a link pasted into the Recipe link box and the Get recipe button outlined">
@@ -84,7 +98,7 @@
       <ol class="guide-steps">
         <li>Lay the card or page flat in good light, and hold the camera straight over it so every word is sharp.</li>
         <li>On <strong>Add a recipe</strong>, under <strong>Recipe card or cookbook page</strong>, click <strong>Choose photos</strong>. On a phone you can take the picture right there, or pick one you already have. Up to 3 photos make one recipe, such as the front and back of a card.</li>
-        <li>Enter the owner code and click <strong>Read recipe</strong>. Reading takes up to a minute.</li>
+        <li>Click <strong>Read recipe</strong>. Reading takes up to a minute.</li>
         <li>The form fills in. <strong>Check every line against the card</strong>, because handwriting can be misread. Anything the reader wasn’t sure of is marked [?], so look for those first.</li>
         <li>Click <strong>Save recipe</strong>.</li>
       </ol>
@@ -94,8 +108,8 @@
           <figcaption>1. A good photo: flat, straight on, in good light.</figcaption>
         </figure>
         <figure class="guide-fig guide-fig-phone">
-          <img src="img/phone-photo-reader.webp" width="700" height="770" loading="lazy" alt="The photo reader on a phone, with the card photo chosen and the owner code entered">
-          <figcaption>2. Choose the photo, enter the code, and tap Read recipe.</figcaption>
+          <img src="img/phone-photo-reader.webp" width="700" height="598" loading="lazy" alt="The photo reader on a phone, with the card photo chosen and the Read recipe button">
+          <figcaption>2. Choose the photo and tap Read recipe.</figcaption>
         </figure>
       </div>
       <figure class="guide-fig guide-fig-narrow">
@@ -121,11 +135,11 @@
             <li><strong>Cook’s notes:</strong> who the recipe came from, serving ideas, or tips.</li>
           </ul>
         </li>
-        <li>Enter the owner code and click <strong>Save recipe</strong>. The recipe opens so you can see how it looks.</li>
+        <li>Click <strong>Save recipe</strong>. The recipe opens so you can see how it looks.</li>
       </ol>
       <figure class="guide-fig guide-fig-narrow">
-        <img src="img/save.webp" width="1000" height="261" loading="lazy" alt="The owner code box and the Save recipe button at the bottom of the form">
-        <figcaption>The bottom of every form: enter the owner code, then save.</figcaption>
+        <img src="img/save.webp" width="1000" height="167" loading="lazy" alt="The bottom of the form: Saving as your email, and the Save recipe button">
+        <figcaption>The bottom of every form shows who you’re saving as.</figcaption>
       </figure>
     </section>
 
@@ -136,7 +150,7 @@
         <li>Open the recipe and scroll to the bottom of the page.</li>
         <li>Click <strong>Edit this recipe</strong>. The form opens already filled in.</li>
         <li>Change what you need. To replace the dish photo, click <strong>Upload a photo</strong>; to take it away, click <strong>Remove photo</strong>.</li>
-        <li>Enter the owner code and click <strong>Save changes</strong>. Click <strong>Cancel</strong> to leave without changing anything.</li>
+        <li>Click <strong>Save changes</strong>. Click <strong>Cancel</strong> to leave without changing anything.</li>
       </ol>
       <p><strong>Please change only recipes you know.</strong> Fix typos and add tips freely, but check with Art before rewriting someone else’s family recipe.</p>
       <figure class="guide-fig">
@@ -148,9 +162,17 @@
         <figcaption>The edit form opens with everything already filled in.</figcaption>
       </figure>
       <div class="guide-tip guide-tip-pic">
-        <p><strong>A shortcut on your own devices.</strong> Tick <strong>Remember the code on this device</strong> when you save, and you won’t have to type the code again on that phone or computer. An <strong>Edit</strong> button also appears next to <strong>Print</strong> at the top of every recipe there. Only tick it on your own devices.</p>
+        <p><strong>A shortcut while you’re signed in.</strong> An <strong>Edit</strong> button appears next to <strong>Print</strong> at the top of every recipe.</p>
         <img src="img/edit-button.webp" width="1000" height="584" loading="lazy" alt="The Edit button next to Print at the top of a recipe">
       </div>
+    </section>
+
+    <section id="sign-out" class="guide-section">
+      <h2>Signing out</h2>
+      <p>You stay signed in on each phone or computer until you sign out. To sign out, for example on a shared computer, scroll to the bottom of any page and click <strong>Sign out</strong>.</p>
+      <figure class="guide-fig">
+        <img src="img/footer-signed-in.webp" width="1000" height="180" loading="lazy" alt="The bottom of the page showing Signed in as your email, with the Sign out button outlined">
+      </figure>
     </section>
 
     <section id="problems" class="guide-section">
@@ -160,8 +182,9 @@
         <table class="guide-table">
           <thead><tr><th scope="col">If you see…</th><th scope="col">Do this</th></tr></thead>
           <tbody>
-            <tr><th scope="row">That owner code isn’t right</th><td>Check the code Art sent you, including capital letters, and try again.</td></tr>
-            <tr><th scope="row">Too many wrong codes were tried</th><td>Saving is paused for 10 minutes. Wait, then try again with the right code.</td></tr>
+            <tr><th scope="row">That email or password isn’t right</th><td>Check both, including capital letters. Still stuck? Use <strong>Forgot your password?</strong> on the sign-in page.</td></tr>
+            <tr><th scope="row">That link has expired or was already used</th><td>Invitation and reset links work once. Sign in, use <strong>Forgot your password?</strong>, or ask Art to send a new invitation.</td></tr>
+            <tr><th scope="row">Your sign-in has ended</th><td>Sign in again, then click Save again.</td></tr>
             <tr><th scope="row">That photo doesn’t look like a recipe</th><td>Take a closer, sharper photo in better light, then try again.</td></tr>
             <tr><th scope="row">That’s today’s limit of photo reads</th><td>Try again tomorrow, or type the recipe in by hand.</td></tr>
             <tr><th scope="row">Anything else</th><td>Wait a minute and try again. If it keeps happening, send Art a screenshot of the message.</td></tr>

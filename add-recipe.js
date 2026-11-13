@@ -1,17 +1,15 @@
 /*
  * "Add a recipe" page. Paste a link and the site reads the recipe from that
  * page (through /api/import on Cloudflare), read one from a photo of a recipe
- * card or cookbook page (through /api/read-photo, owner code only), or type
+ * card or cookbook page (through /api/read-photo), or type
  * one in. Saving needs the
- * owner code, which is checked by the database (see supabase/add-recipes-table.sql).
+ * contributor sign-in (auth.js); the database checks it (supabase/add-accounts.sql).
  *
  * The same form edits a recipe (AddRecipe.mount with ctx.edit set), saving
  * through update_recipe (see supabase/add-recipe-editing.sql).
  */
 (function () {
   "use strict";
-
-  var CODE_STORE = "dse-owner-code";
 
   function esc(value) {
     return String(value == null ? "" : value)
@@ -20,23 +18,6 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
-  }
-
-  function readCode() {
-    try {
-      return localStorage.getItem(CODE_STORE) || "";
-    } catch (e) {
-      return "";
-    }
-  }
-
-  function storeCode(code, keep) {
-    try {
-      if (keep && code) localStorage.setItem(CODE_STORE, code);
-      else localStorage.removeItem(CODE_STORE);
-    } catch (e) {
-      /* Not important. */
-    }
   }
 
   function slug(text) {
@@ -92,10 +73,10 @@
   };
 
   var SAVE_ERRORS = {
-    wrong_code: "That owner code isn’t right. Check it and try again.",
-    too_many_attempts: "Too many wrong codes were tried, so saving is paused for 10 minutes.",
+    not_signed_in: "Your sign-in has ended. Sign in again (your changes are still here if you open Sign in in a new tab), then click Save again.",
+    not_contributor: "This account can’t add or edit recipes. Ask Art to invite you from the site’s dashboard.",
     missing_title: "Give the recipe a title.",
-    not_set_up: "Editing isn’t switched on yet. Run supabase/add-recipe-editing.sql in the Supabase SQL Editor (see “Edit a recipe” in README.md).",
+    not_set_up: "Saving with accounts isn’t switched on yet. Run supabase/add-accounts.sql in the Supabase SQL Editor (see “Contributor accounts” in README.md).",
     invalid_input: "Something is too long or not in the right form. Photo links must start with https://, and steps can be up to about 40,000 characters in all.",
     network: "Couldn’t reach the recipe database. Check your connection and try again."
   };
@@ -125,7 +106,6 @@
     (ctx.takenIds || []).forEach(function (id) {
       taken[id] = true;
     });
-    var savedCode = readCode();
     var editing = ctx.edit || null;
     var backIcon = '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.5 5L6.5 10l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     var saveLabel = editing ? "Save changes" : "Save recipe";
@@ -164,8 +144,6 @@
       '<ul class="read-thumbs" id="read-thumbs" aria-label="Chosen photos" hidden></ul>' +
       "</div>" +
       '<div class="read-row">' +
-      '<label class="field read-code"><span class="field-label">Owner code</span>' +
-      '<input id="read-code" type="password" autocomplete="off" maxlength="100" value="' + esc(savedCode) + '"></label>' +
       '<button class="btn" type="submit" id="read-btn">Read recipe</button>' +
       "</div>" +
       '<p class="form-msg" id="read-msg" role="status" aria-live="polite"></p>' +
@@ -206,8 +184,7 @@
         "Where the recipe came from. Shown as “Adapted from” on the recipe page.") +
       "</div>" +
       '<div class="save-row">' +
-      field("Owner code", '<input name="code" type="password" autocomplete="off" maxlength="100" required value="' + esc(savedCode) + '">', "", editing ? "Only you can change recipes." : "Only you can save recipes.") +
-      '<label class="check"><input type="checkbox" name="keep"' + (savedCode ? " checked" : "") + "> Remember the code on this device</label>" +
+      '<p class="signed-in-note">Saving as <strong>' + esc(window.Auth ? window.Auth.email() : "") + "</strong></p>" +
       "</div>" +
       '<div class="form-foot">' +
       '<button class="btn" type="submit" id="save-btn">' + saveLabel + "</button>" +
@@ -364,7 +341,6 @@
       var category = catSelect.value === "__new" ? newCat.value.trim() : catSelect.value;
       var ingredients = lines(el.ingredients.value);
       var steps = lines(el.steps.value);
-      var code = el.code.value.trim();
       var image = el.image.value.trim();
       var source = el.source.value.trim();
 
@@ -387,11 +363,6 @@
       if (source && !/^https?:\/\//i.test(source)) {
         setMsg(saveMsg, "The source must be a full link starting with https://.", "error");
         el.source.focus();
-        return;
-      }
-      if (!code) {
-        setMsg(saveMsg, "Enter your owner code.", "error");
-        el.code.focus();
         return;
       }
 
@@ -424,17 +395,21 @@
       saveBtn.disabled = true;
       saveBtn.textContent = photoBlob ? "Uploading photo…" : "Saving…";
       setMsg(saveMsg, "", "");
-      var photoStep = photoBlob ? uploadPhoto(code, photoBlob) : Promise.resolve(null);
-      photoStep
+      var token = null;
+      signInToken()
+        .then(function (t) {
+          token = t;
+          return photoBlob ? uploadPhoto(token, photoBlob) : null;
+        })
         .then(function (url) {
           if (url) {
             recipe.image = url;
             saveBtn.textContent = "Saving…";
           }
           if (editing) {
-            return window.Reviews.api("/rpc/update_recipe", { method: "POST", body: { p_code: code, p_id: id, p_recipe: recipe } });
+            return window.Reviews.api("/rpc/contributor_update_recipe", { method: "POST", token: token, body: { p_id: id, p_recipe: recipe } });
           }
-          return window.Reviews.api("/rpc/add_recipe", { method: "POST", body: { p_code: code, p_recipe: recipe } });
+          return window.Reviews.api("/rpc/contributor_add_recipe", { method: "POST", token: token, body: { p_recipe: recipe } });
         })
         .then(function (data) {
           if (!data || data.ok !== true) {
@@ -442,7 +417,6 @@
             err.kind = "server";
             throw err;
           }
-          storeCode(code, el.keep.checked);
           recipe.id = data.id || recipe.id;
           recipe._saved = true;
           recipe._added = editing ? editing._added || "" : new Date().toISOString();
@@ -451,13 +425,10 @@
         })
         .catch(function (err) {
           var key = err && err.kind === "network" ? "network" : (err && err.message) || "";
-          // update_recipe missing from Supabase: the editing SQL hasn't been run.
-          if (editing && err && err.kind === "server" && (err.status === 404 || /update_recipe/.test(key))) key = "not_set_up";
-          if (key === "wrong_code") {
-            storeCode("", false);
-            el.code.value = "";
-            el.code.focus();
-          }
+          // The contributor functions missing from Supabase: add-accounts.sql hasn't been run.
+          if (err && err.kind === "server" && (err.status === 404 || err.code === "PGRST202" || /contributor_/.test(key))) key = "not_set_up";
+          // An expired or refused sign-in.
+          if (err && err.kind === "server" && (err.status === 401 || err.status === 403 || /JWT/i.test(key))) key = "not_signed_in";
           if (PHOTO_ERRORS[key]) {
             setMsg(saveMsg, PHOTO_ERRORS[key], "error");
             return;
@@ -486,7 +457,6 @@
     var readForm = root.querySelector("#read-form");
     var readFile = root.querySelector("#read-file");
     var readThumbs = root.querySelector("#read-thumbs");
-    var readCodeInput = root.querySelector("#read-code");
     var readBtn = root.querySelector("#read-btn");
     var readMsg = root.querySelector("#read-msg");
     var readPhotos = []; // { blob, url }
@@ -546,21 +516,23 @@
     readForm.addEventListener("submit", function (e) {
       e.preventDefault();
       if (readBtn.disabled) return;
-      var code = readCodeInput.value.trim();
       if (!readPhotos.length) {
         setMsg(readMsg, "Choose a photo of the recipe first.", "error");
         readFile.focus();
         return;
       }
-      if (!code) {
-        setMsg(readMsg, "Enter your owner code. Only you can read photos.", "error");
-        readCodeInput.focus();
-        return;
-      }
       readBtn.disabled = true;
       readBtn.textContent = "Reading…";
       setMsg(readMsg, "Reading your " + (readPhotos.length === 1 ? "photo" : "photos") + ". This can take up to a minute.", "");
-      readRecipePhotos(code, readPhotos.map(function (p) { return p.url; }), cats).then(function (data) {
+      var images = readPhotos.map(function (p) { return p.url; });
+      signInToken()
+        .then(function (token) {
+          return readRecipePhotos(token, images, cats);
+        })
+        .catch(function () {
+          return { ok: false, error: "not_signed_in" };
+        })
+        .then(function (data) {
         readBtn.disabled = false;
         readBtn.textContent = "Read recipe";
         if (data && data.ok && data.recipe) {
@@ -572,15 +544,9 @@
             "ok"
           );
           showForm(data.recipe, "", false);
-          form.elements.code.value = code;
           return;
         }
         var key = (data && data.error) || "network";
-        if (key === "wrong_code") {
-          storeCode("", false);
-          readCodeInput.value = "";
-          readCodeInput.focus();
-        }
         var text = READ_ERRORS[key] || SAVE_ERRORS[key] || READ_ERRORS.network;
         if (key === "not_set_up" && data && READ_MISSING[data.missing]) text = READ_MISSING[data.missing];
         if (data && typeof data.detail === "string" && data.detail) text += " (Details: " + data.detail + ")";
@@ -592,9 +558,9 @@
   }
 
   /* ---------- Reading a recipe from photos ----------
-     Photos are shrunk in the browser, then sent with the owner code to
-     /api/read-photo on Cloudflare (worker/read-photo.js), which checks the
-     code and asks Claude to read the recipe. Nothing is saved until you click
+     Photos are shrunk in the browser, then sent with the contributor's
+     sign-in to /api/read-photo on Cloudflare (worker/read-photo.js), which
+     checks it with Supabase and asks Claude to read the recipe. Nothing is saved until you click
      Save recipe. */
 
   var READ_MAX_PHOTOS = 3;
@@ -602,8 +568,8 @@
 
   var READ_ERRORS = {
     not_set_up: "Reading photos isn’t switched on yet. See “Read a recipe from a photo” in README.md for the one-time setup.",
-    wrong_code: "That owner code isn’t right. Check it and try again.",
-    too_many_attempts: "Too many wrong codes were tried, so this is paused for 10 minutes.",
+    not_signed_in: "Your sign-in has ended. Sign in again, then read the photo.",
+    not_contributor: "This account can’t read photos. Ask Art to invite you from the site’s dashboard.",
     daily_limit: "That’s today’s limit of photo reads. Try again tomorrow, or type the recipe in.",
     not_a_recipe: "That photo doesn’t look like a recipe, or the writing couldn’t be read. Try a closer, sharper photo in good light.",
     too_many_photos: "Up to " + READ_MAX_PHOTOS + " photos per recipe. Remove one to add another.",
@@ -613,7 +579,7 @@
     no_credit: "The Claude account behind the photo reader is out of credit or over its spending limit. Check it at platform.claude.com, then try again.",
     key_problem: "The photo reader’s Claude API key isn’t working. Check ANTHROPIC_API_KEY in the Cloudflare dashboard.",
     model_problem: "The photo reader’s model name isn’t recognized. Check PHOTO_MODEL in wrangler.jsonc.",
-    check_failed: "Couldn’t check the owner code just now. Try again in a minute.",
+    check_failed: "Couldn’t check your sign-in just now. Try again in a minute.",
     reader_failed: "Couldn’t read the photo just now. Try again, or type the recipe in.",
     network: "The photo reader isn’t available right now. Check your connection and try again, or type the recipe in."
   };
@@ -622,14 +588,14 @@
   var READ_MISSING = {
     key: "Reading photos isn’t switched on yet: Cloudflare can’t find the secret ANTHROPIC_API_KEY. In the Cloudflare dashboard open the recipes Worker → Settings → Variables and Secrets, and add it with the type Secret.",
     settings: "Reading photos isn’t switched on yet: the Supabase settings in wrangler.jsonc didn’t reach Cloudflare. Push the latest version again.",
-    database: "Reading photos isn’t switched on yet: Supabase doesn’t have photo_read_ticket. Run supabase/add-photo-reading.sql in the Supabase SQL Editor."
+    database: "Reading photos isn’t switched on yet: Supabase doesn’t have contributor_photo_read_ticket. Run supabase/add-accounts.sql in the Supabase SQL Editor."
   };
 
-  function readRecipePhotos(code, images, categories) {
+  function readRecipePhotos(token, images, categories) {
     return fetch("/api/read-photo", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ code: code, images: images, categories: categories })
+      headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({ images: images, categories: categories })
     })
       .catch(function () {
         return null;
@@ -647,8 +613,8 @@
   /* ---------- Photo upload ----------
      The photo is shrunk in the browser (longest side 1600 px, JPEG), then
      saved to the Supabase storage bucket "recipe-photos". Uploading needs
-     the owner code: the database hands out a short-lived folder ticket only
-     for the right code (see supabase/add-photo-uploads.sql). */
+     a contributor sign-in: the database hands out a short-lived folder ticket
+     only to a signed-in contributor (see supabase/add-accounts.sql). */
 
   var PHOTO_MAX = 1600;
   var PHOTO_BUCKET = "recipe-photos";
@@ -706,10 +672,19 @@
     return err;
   }
 
-  function uploadPhoto(code, blob) {
+  /* The signed-in contributor's token, or a "not_signed_in" error. */
+  function signInToken() {
+    if (!window.Auth) return Promise.reject(fail("not_signed_in"));
+    return window.Auth.token().then(function (t) {
+      if (!t) throw fail("not_signed_in");
+      return t;
+    });
+  }
+
+  function uploadPhoto(token, blob) {
     var cfg = window.REVIEWS_CONFIG || {};
     var base = String(cfg.url || "").replace(/\/+$/, "");
-    return window.Reviews.api("/rpc/photo_upload_ticket", { method: "POST", body: { p_code: code } })
+    return window.Reviews.api("/rpc/contributor_photo_upload_ticket", { method: "POST", token: token, body: {} })
       .catch(function (err) {
         // A missing function means the SQL file hasn't been run yet.
         if (err && (err.status === 404 || err.code === "PGRST202")) throw fail("photo_setup");

@@ -57,29 +57,29 @@ The easier way is **Add a recipe** on the site itself (next section); it needs n
 
 ## Add a recipe from a link (on the site)
 
-Click **Add a recipe** at the top of any page. Paste a link to a recipe page and click **Get recipe**: the title, ingredients, method, time, and servings fill in for you to check. Click **Type a recipe in instead** for family recipes with no link. Enter your **owner code** and click **Save recipe**. It shows on the site right away for everyone.
+Click **Add a recipe** at the top of any page. Paste a link to a recipe page and click **Get recipe**: the title, ingredients, method, time, and servings fill in for you to check. Click **Type a recipe in instead** for family recipes with no link. Click **Save recipe** (you need to be signed in; see Contributor accounts). It shows on the site right away for everyone.
 
 How it works: most recipe sites publish their recipe in a standard format (schema.org "Recipe") for Google. `worker/index.js` runs on Cloudflare at `/api/import`, reads that data from the page you link to, and hands it back to the form. Some sites block this; the form then keeps the link and you type the rest in.
 
 Recipes added this way are saved in the Supabase table `public.recipes`, not in `recipes.js`. Both kinds appear together on the site.
 
 - **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipes-table.sql`, change `CHANGE-THIS-CODE` near the bottom to your own owner code, and click **Run**.
-- **Change the owner code:** run the last statement in that file again with the new code.
+- The owner code is switched off once `add-accounts.sql` has been run; saving then needs a contributor account.
 - **Hide or remove a saved recipe:** Supabase → **Table Editor** → **recipes**. Set **hidden** to `true` to take it off the site, or delete the row.
 - **Fix a typo in a saved recipe:** edit the row in the same table. Ingredients and steps are lists; each line is one item.
 - Photos: the form leaves the photo link empty on purpose, because pictures on other sites belong to their owners. Paste a link to your own photo (it must start with `https://`).
-Uploading a photo: on the Add a recipe form, click **Upload a photo** to take one with your phone or pick one from your computer. It's shrunk in the browser (longest side 1600 px, JPEG) and saved in the Supabase storage bucket `recipe-photos` when you click Save recipe. Uploading needs your owner code, just like saving.
+Uploading a photo: on the Add a recipe form, click **Upload a photo** to take one with your phone or pick one from your computer. It's shrunk in the browser (longest side 1600 px, JPEG) and saved in the Supabase storage bucket `recipe-photos` when you click Save recipe. Uploading needs a contributor sign-in, just like saving.
 - One-time setup: in Supabase open SQL Editor, paste supabase/add-photo-uploads.sql, and click Run. Until then the form says photo uploads aren't switched on, and photo links still work.
 - Delete an uploaded photo: Supabase → Storage → recipe-photos → open the folder → pick the file → Delete. Then clear the recipe's image in Table Editor → recipes, or its card will simply show no photo.
 - Copied method steps are the original cook's words. Rewriting them in your own words is good practice; the source link is always credited as "Adapted from" on the recipe page.
 
 ## Read a recipe from a photo (on the site)
 
-On **Add a recipe**, under **Recipe card or cookbook page**, click **Choose photos**. On a phone you can take the picture right there. Up to 3 photos make one recipe, for example the front and back of a card. Enter your **owner code** and click **Read recipe**. After about 10–60 seconds the form fills in. **Check every line against the card**, because handwriting can be misread. Anything the reader wasn't sure of is marked `[?]` and listed above the form. Then click **Save recipe** as usual.
+On **Add a recipe**, under **Recipe card or cookbook page**, click **Choose photos**. On a phone you can take the picture right there. Up to 3 photos make one recipe, for example the front and back of a card. Click **Read recipe**. After about 10–60 seconds the form fills in. **Check every line against the card**, because handwriting can be misread. Anything the reader wasn't sure of is marked `[?]` and listed above the form. Then click **Save recipe** as usual.
 
-Only someone with the owner code can use it. The code is checked before the photo is sent anywhere.
+Only a signed-in contributor can use it. The sign-in is checked before the photo is sent anywhere.
 
-How it works: `worker/read-photo.js` runs on Cloudflare at `/api/read-photo`. It checks the owner code with Supabase (`public.photo_read_ticket`), then sends the photo to the **Claude API**, which reads the recipe and hands the fields back to the form. The photo itself isn't kept. If you also want a picture of the finished dish, add it with **Upload a photo** in the form.
+How it works: `worker/read-photo.js` runs on Cloudflare at `/api/read-photo`. It checks the contributor's sign-in with Supabase (`public.contributor_photo_read_ticket`), then sends the photo to the **Claude API**, which reads the recipe and hands the fields back to the form. The photo itself isn't kept. If you also want a picture of the finished dish, add it with **Upload a photo** in the form.
 
 Each read costs a little on your Claude API account: a few cents at most with the default model. To limit spending:
 
@@ -98,13 +98,36 @@ Until steps 1–3 are done, the form says reading photos isn't switched on yet. 
 
 ## Edit a recipe (on the site)
 
-Open the recipe and click **Edit this recipe** at the bottom of the page. The form opens already filled in. Change anything, including the photo (upload a new one, or click **Remove photo**). Enter your owner code and click **Save changes**. Visitors see the changes the next time they open the recipe.
+Open the recipe and click **Edit this recipe** at the bottom of the page. The form opens already filled in. Change anything, including the photo (upload a new one, or click **Remove photo**). Click **Save changes** (you need to be signed in). Visitors see the changes the next time they open the recipe.
 
-If you tick **Remember the code on this device** when saving, an **Edit** button also appears next to **Print** at the top of every recipe on that device.
+While you're signed in, an **Edit** button also appears next to **Print** at the top of every recipe.
 
 Any recipe can be edited this way, including the ones written in `recipes.js`. For those, the edited version is saved in Supabase under the same id and shown instead of the copy in `recipes.js`. That means a later change typed into `recipes.js` won't show for a recipe you've already edited on the site; make further changes to it on the site instead.
 
 **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-editing.sql`, and click **Run**. Until then, saving changes says editing isn't switched on yet.
+
+## Contributor accounts
+
+Reading recipes and leaving reviews need no account. **Adding and editing recipes, uploading dish photos, and reading recipe cards need a contributor account.** Accounts are invite-only, and people sign in with their email and a password. The owner code is no longer used.
+
+### One-time setup in Supabase
+
+1. **Turn off open sign-ups.** In the dark-sparrow-eats project open **Authentication**, then the sign-in settings (**Sign In / Providers**), and switch off **Allow new users to sign up**. Leave the **Email** provider on. (Even if this were left on, an account that wasn't invited can't save anything.)
+2. **Tell Supabase the site's address.** Open **Authentication → URL Configuration**. Set **Site URL** to `https://recipes.the-dark-sparro.workers.dev` and add the same address under **Redirect URLs**. Invitation and password-reset emails link back here.
+3. **Run the SQL.** Open **SQL Editor**, paste `supabase/add-accounts.sql`, and click **Run**. This adds the sign-in checks and switches the owner code off.
+4. **Invite yourself first.** Open **Authentication → Users → Add user → Send invitation**, enter your email, and send. Open the email, click the link, and choose a password on the site.
+
+### Invite, remove, or reset someone
+
+- **Invite:** Authentication → Users → **Add user → Send invitation**. Only invited accounts can add or edit recipes. Use "Send invitation", not "Create new user", or the account won't count as invited.
+- **Remove:** Authentication → Users → the person's row → **Delete user** (or ban them). They can't save anything from then on.
+- **Forgotten password:** they click **Forgot your password?** on the sign-in page, or you can send a reset from their row in Users.
+
+Supabase's built-in email sends only a few emails an hour, so invite people a few at a time. To send more, connect your own email service under **Authentication → Emails → SMTP Settings**. You can reword the invitation under **Authentication → Emails → Invite user**.
+
+To bring the owner code back (alongside accounts or instead of them), run `supabase/restore-owner-code.sql`.
+
+How it works: `auth.js` signs people in with Supabase Auth and keeps them signed in on that device. Saves send the sign-in to the `contributor_*` functions in `supabase/add-accounts.sql`, which check that the person is signed in with an invited account that hasn't been deleted or banned. The photo reader (`worker/read-photo.js`) passes the sign-in to Supabase the same way before calling Claude.
 
 ## Contributor guide
 
