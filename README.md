@@ -15,46 +15,13 @@ Then visit http://localhost:8000 . Stop the server with Ctrl+C when you are done
 
 Use a local server rather than opening `index.html` as a file. Some browsers block scripts on `file://` pages.
 
-## Add a recipe in recipes.js
+## Where recipes live
 
-Edit `recipes.js`. Every recipe is one object inside `window.RECIPES`. The array starts empty, so the site shows an empty journal until you add one.
+All recipes are stored in the database (Supabase, table `public.recipes`). Add them with **Add a recipe** on the site and change them with a recipe's **Edit** button (both need a contributor sign-in; see the next sections).
 
-Copy this object into the array, then change the text. Keep a comma between recipes. `id` is the link: lowercase words separated by hyphens, and unique for each recipe.
+The recipes that used to be typed into `recipes.js` were moved into the database in November 2026 by `supabase/move-recipes-js.sql`, keeping their ids, so links, ratings, meal plans, hidden settings and contributor names stayed attached. `recipes.js` is now an empty list. The old text is still in its GitHub history.
 
-```js
-window.RECIPES = [
-  {
-    id: "weeknight-tomato-soup",
-    title: "Weeknight tomato soup",
-    category: "Soups",
-    tags: ["vegetarian", "quick"],
-    timeMinutes: 35,
-    servings: 4,
-    image: "",
-    ingredients: [
-      "2 tbsp olive oil",
-      "1 onion, diced",
-      "2 cans crushed tomatoes"
-    ],
-    steps: [
-      "Warm the oil and soften the onion.",
-      "Add the tomatoes and simmer for 20 minutes.",
-      "Season and serve."
-    ],
-    notes: "Better the next day."
-  }
-];
-```
-
-Save the file, then open `index.html` and raise the number in `recipes.js?v=8` (to `v=9`, `v=10`, and so on). That makes browsers fetch the new list right away instead of showing an older copy. Do the same for any other file you change.
-
-The easier way is **Add a recipe** on the site itself (next section); it needs no file editing.
-
-- `image` is a URL, a relative path such as `images/soup.jpg`, or `""` if there is no photo.
-- Use `null` for `timeMinutes` or `servings` when you do not want them shown.
-- `category` should be spelled exactly like one in the category list (see **Categories** below). `tags` are the small labels on each card.
-- Search checks the title, category, tags, ingredients, steps, and notes.
-- Add `hidden: true` to keep a recipe off the public site; only the site owner will see it (see **Hide a recipe** below).
+`recipes.js` still works if a recipe is ever placed in it (same format as before, with `hidden: true` to show it only to the owner), but the database is the place for recipes now.
 
 ## Add a recipe from a link (on the site)
 
@@ -62,7 +29,7 @@ Click **Add a recipe** at the top of any page. Paste a link to a recipe page and
 
 How it works: most recipe sites publish their recipe in a standard format (schema.org "Recipe") for Google. `worker/index.js` runs on Cloudflare at `/api/import`, reads that data from the page you link to, and hands it back to the form. Some sites block this; the form then keeps the link and you type the rest in.
 
-Recipes added this way are saved in the Supabase table `public.recipes`, not in `recipes.js`. Both kinds appear together on the site.
+Recipes added this way are saved in the Supabase table `public.recipes`, with all the others.
 
 - **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipes-table.sql`, change `CHANGE-THIS-CODE` near the bottom to your own owner code, and click **Run**.
 - The owner code is switched off once `add-accounts.sql` has been run; saving then needs a contributor account.
@@ -103,7 +70,7 @@ Open the recipe and click **Edit this recipe** at the bottom of the page. The fo
 
 While you're signed in, an **Edit** button also appears next to **Print** at the top of every recipe.
 
-Any recipe can be edited this way, including the ones written in `recipes.js`. For those, the edited version is saved in Supabase under the same id and shown instead of the copy in `recipes.js`. That means a later change typed into `recipes.js` won't show for a recipe you've already edited on the site; make further changes to it on the site instead.
+Any recipe can be edited this way.
 
 **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-editing.sql`, and click **Run**. Until then, saving changes says editing isn't switched on yet.
 
@@ -248,7 +215,7 @@ The `python3 -m http.server` method above is still the easiest. To preview with 
 
 The home page shows one tile per category with that category's top-rated recipe (highest average, then most reviews, then title). Categories with no ratings yet show their first recipe by title. Each tile has a **See all** button that opens the full list for that category. Typing in search or picking a category also shows the full matching list, and **Top picks** goes back.
 
-The same example is commented out at the top of `recipes.js`. Removing the `// ` at the start of those lines is valid JavaScript, but the page only shows objects inside `window.RECIPES`.
+The old example recipe that used to sit at the top of `recipes.js` is in that file's GitHub history.
 
 ## Ratings and comments
 
@@ -260,7 +227,7 @@ Reviews are stored in a free Supabase project called **dark-sparrow-eats**:
 - View `public.review_stats` gives the average rating and count per recipe, skipping hidden reviews.
 - Visitors post through the database function `public.submit_review`, which checks the review code before saving. They cannot write to the table directly.
 - `config.js` has the project URL and the public (publishable) key. The same URL is listed in `_headers`; if the Supabase project ever changes, update both. That key is safe in the browser. Never put a secret or `service_role` key in this site.
-- The `recipe_id` saved with a review is the recipe's `id` in `recipes.js`. If you change an `id`, its old reviews stop showing.
+- The `recipe_id` saved with a review is the recipe's `id`. If an `id` ever changed, its old reviews would stop showing.
 
 Spam protection: visitors can only add reviews, never edit or delete them. The database rejects links in names and comments, and accepts at most 3 reviews per recipe and 10 site-wide per minute. The form also has a hidden honeypot field that bots tend to fill in.
 
