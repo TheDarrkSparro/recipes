@@ -784,6 +784,10 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 .link-row .btn { flex: none; }
 .link-form .form-msg { width: 100%; }
 
+.add-guide { margin: -0.4rem 0 1.25rem; font-size: 0.95rem; color: var(--muted); }
+.add-guide a, .footer-guide a { color: var(--sage-deep); font-weight: 600; text-underline-offset: 0.2em; }
+.footer .footer-guide { margin-top: 0.35rem; font-size: 0.9rem; }
+
 .add-or {
   display: flex;
   align-items: center;
