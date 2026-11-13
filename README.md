@@ -138,6 +138,10 @@ If some recipes use a category that isn't in the list (for example an old one in
 
 How it works: `public.recipe_categories` holds the list (name, order, and old names in `also_matches`); anyone can read it. `owner_save_categories()` saves the whole list and checks in the database that the caller is the owner. A database check (`recipes_category_check`) refuses any recipe saved with a category that isn't in the list; edits that keep a recipe's existing category are still allowed.
 
+## Keep screen on
+
+Every recipe page has a **Keep screen on** switch next to **Print**, so a phone or tablet doesn't dim or lock while someone cooks. Once switched on, it stays on for other recipes opened in the same tab, and turns itself off when leaving recipe pages. It uses the browser's Screen Wake Lock feature, which works in current Chrome, Edge, Safari (iPhone and iPad with iOS 16.4 or later) and Firefox. On browsers without it, the switch doesn't appear. Battery saver mode can stop it from working; the page says so if that happens.
+
 ## Barcelona tile
 
 The site's paving pattern is an original drawing in the spirit of Barcelona's *panot de flor* sidewalk tile. It appears tone-on-tone in the red header, as a tile bed behind the home page photo, and as a sidewalk strip above the footer. The tiles are small SVG files in `img/` (`panot-red.svg`, `panot-sand.svg`), placed by `styles.css`. To change their colors, edit the `COLORWAYS` in `img/make-panot.py` and run `python3 img/make-panot.py img`.

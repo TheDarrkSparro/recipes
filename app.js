@@ -768,6 +768,11 @@
       '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5.5 7V3h9v4M5.5 14h-2V8.5a1.5 1.5 0 0 1 1.5-1.5h10a1.5 1.5 0 0 1 1.5 1.5V14h-2M5.5 11.5h9V17h-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
       "Print</button>" +
       '<span class="plan-add" id="plan-add"></span>' +
+      (wakeSupported()
+        ? '<label class="wake-switch"><input type="checkbox" role="switch" id="wake-toggle"' + (wake.want ? " checked" : "") + ">" +
+          '<span class="wake-track" aria-hidden="true"><span class="wake-thumb"></span></span>' +
+          "<span>Keep screen on</span></label>"
+        : "") +
       (signedIn()
         ? '<a class="btn btn-quiet" href="#/edit/' + esc(encodeURIComponent(rid)) + '">' +
           '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M12.8 4.2l3 3L7.5 15.5l-3.7.7.7-3.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
@@ -779,6 +784,7 @@
               "</button>")
         : "") +
       "</div>" +
+      '<p class="wake-msg" id="wake-msg" role="status" hidden></p>' +
       '<p class="visibility-msg" id="visibility-msg" role="status" hidden></p>' +
       "</header>" +
       (image ? '<figure class="photo"><img src="' + esc(image) + '" alt=""></figure>' : "") +
@@ -880,6 +886,14 @@
       }
     });
 
+    var wakeToggle = document.getElementById("wake-toggle");
+    if (wakeToggle) {
+      wakeToggle.addEventListener("change", function () {
+        setWake(wakeToggle.checked);
+      });
+      if (wake.want) acquireWake();
+    }
+
     if (window.Planner && rid) {
       window.Planner.mountAddButton(document.getElementById("plan-add"), { id: rid, title: titleOf(recipe), category: str(recipe.category) }, function (pid) {
         var r = findRecipe(pid);
@@ -976,6 +990,82 @@
         say(VISIBILITY_ERRORS[key] || VISIBILITY_ERRORS.failed);
       });
   }
+
+  /* ---------- Keep screen on while cooking (Screen Wake Lock) ----------
+     The choice lasts for this browser tab, so the next recipe opened stays
+     on too. The lock is let go when leaving recipe pages; the browser also
+     lets go when the tab is hidden, so it's taken again on return. */
+
+  var WAKE_STORE = "dse-wake";
+  var wake = { want: false, lock: null };
+  try {
+    wake.want = sessionStorage.getItem(WAKE_STORE) === "1";
+  } catch (e) {
+    /* Not important. */
+  }
+
+  function wakeSupported() {
+    return !!(navigator.wakeLock && navigator.wakeLock.request);
+  }
+
+  function wakeUI(message) {
+    var box = document.getElementById("wake-toggle");
+    if (box) box.checked = wake.want;
+    var msg = document.getElementById("wake-msg");
+    if (msg) {
+      msg.textContent = message || "";
+      msg.hidden = !message;
+    }
+  }
+
+  function acquireWake() {
+    if (!wake.want || wake.lock || !wakeSupported() || document.visibilityState !== "visible") return;
+    navigator.wakeLock
+      .request("screen")
+      .then(function (lock) {
+        if (!wake.want || current.name !== "detail") {
+          lock.release().catch(function () {});
+          return;
+        }
+        wake.lock = lock;
+        lock.addEventListener("release", function () {
+          if (wake.lock === lock) wake.lock = null;
+        });
+        wakeUI("");
+      })
+      .catch(function () {
+        wake.want = false;
+        try {
+          sessionStorage.removeItem(WAKE_STORE);
+        } catch (e) {
+          /* Not important. */
+        }
+        wakeUI("This device didn’t allow it. Battery saver can block keeping the screen on.");
+      });
+  }
+
+  function releaseWake() {
+    var lock = wake.lock;
+    wake.lock = null;
+    if (lock) lock.release().catch(function () {});
+  }
+
+  function setWake(on) {
+    wake.want = !!on;
+    try {
+      if (on) sessionStorage.setItem(WAKE_STORE, "1");
+      else sessionStorage.removeItem(WAKE_STORE);
+    } catch (e) {
+      /* Not important. */
+    }
+    wakeUI("");
+    if (on) acquireWake();
+    else releaseWake();
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && current.name === "detail") acquireWake();
+  });
 
   function backArrow() {
     return '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.5 5L6.5 10l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1471,6 +1561,7 @@
   function route() {
     var prev = current.name;
     current = parseRoute();
+    if (current.name !== "detail") releaseWake();
     document.body.setAttribute("data-view", current.name);
     markNav();
     if (current.name === "detail") renderDetail(current.id);
