@@ -792,6 +792,13 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 
 .nav-short { display: none; }
 
+.sync-status { margin: -1rem 0 1.25rem; padding-left: 1.6rem; color: var(--muted); font-size: 0.9rem; position: relative; min-height: 1.3rem; }
+.sync-status::before { content: ""; position: absolute; left: 0.35rem; top: 0.45rem; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #b8bfc4; }
+.sync-status.is-synced::before { background: #2f8f4e; }
+.sync-status.is-saving::before, .sync-status.is-checking::before { background: var(--saffron); }
+.sync-status.is-offline::before, .sync-status.is-setup::before { background: var(--sage); }
+.sync-status a { color: var(--sage-deep); font-weight: 600; text-underline-offset: 0.2em; }
+
 .plan { max-width: 64rem; }
 .shop { max-width: 46rem; }
 .week-nav { display: flex; align-items: center; gap: 0.75rem; margin: 0 0 1.25rem; }
@@ -913,7 +920,7 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
   body[data-view="plan"] .week-step,
   body[data-view="plan"] .plan-foot,
   body[data-view="plan"] .plan-open,
-  .plan-add, .plan-add-panel { display: none !important; }
+  .plan-add, .plan-add-panel, .sync-status { display: none !important; }
   .shop-list { border: 0; }
   .shop-item { break-inside: avoid; }
   .plan-day.is-today { background: none; }

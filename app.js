@@ -836,7 +836,8 @@
       /* Keep the raw hash if it is not valid encoding. */
     }
     if (/^\/?add\/?$/.test(hash)) return { name: "add" };
-    if (/^\/?signin\/?$/.test(hash)) return { name: "signin" };
+    var si = hash.match(/^\/?signin(?:\/(plan|shopping))?\/?$/);
+    if (si) return { name: "signin", next: si[1] || "" };
     var plan = hash.match(/^\/?(plan|shopping)(?:\/(\d{4}-\d{2}-\d{2}))?\/?$/);
     if (plan) return { name: plan[1], week: plan[2] || "" };
     if (/^\/?set-password\/?$/.test(hash)) return { name: "set-password" };
@@ -866,7 +867,13 @@
     else if (current.name === "edit") renderEdit(current.id);
     else if (current.name === "plan" || current.name === "shopping") renderPlanner(current.name, current.week);
     else if (current.name === "signin") {
-      if (window.Auth) window.Auth.renderSignIn(app, { next: "#/add" });
+      if (window.Auth)
+        window.Auth.renderSignIn(
+          app,
+          current.next
+            ? { next: "#/" + current.next, reason: "Sign in to keep your meal plan and shopping list on your account, so they’re the same on your phone and computer." }
+            : { next: "#/add" }
+        );
       else renderList();
     } else if (current.name === "set-password") {
       if (window.Auth) window.Auth.renderSetPassword(app);

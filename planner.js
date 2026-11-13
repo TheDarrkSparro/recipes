@@ -4,7 +4,10 @@
  *
  * - Breakfast, lunch and dinner each day; weeks run Sunday to Saturday.
  * - Everything is saved in this browser on this device (localStorage), so
- *   no account is needed. Clearing the browser's site data clears the plan.
+ *   no account is needed. When someone is signed in (auth.js), the plan and
+ *   shopping list are also saved to their account (supabase/
+ *   add-meal-plan-sync.sql), so they can plan on a laptop and shop with a
+ *   phone. This device's copy is then just a cache of the account's.
  * - The shopping list groups the same ingredient from different recipes
  *   (see ingredients.js) and lets you tick off what you already have.
  */
@@ -134,13 +137,245 @@
       if (k < cutoff) delete plan[k];
     });
     write(PLAN_STORE, plan);
+    queueDay(key);
   }
 
   function clearDay(key) {
     var plan = getPlan();
     delete plan[key];
     write(PLAN_STORE, plan);
+    queueDay(key);
   }
+
+  /* ---------- Saving to your account (signed in) ----------
+     Only the days and weeks that changed are sent (save_meal_plan merges
+     them), so a phone ticking items and a laptop planning don't overwrite
+     each other. Changes made offline wait here and go when back online. */
+
+  var SYNC_META = "dse-plan-sync"; // { user: "<account id>" }: whose account this device's copy belongs to
+  var pending = { days: {}, shopping: {} };
+  var hasPending = false;
+  var flushTimer = null;
+  var syncState = "local";
+  var shown = null; // the planner page on screen: { draw: function }
+
+  function account() {
+    return window.Auth && window.Auth.signedIn() && window.Reviews && window.Reviews.api ? window.Auth : null;
+  }
+
+  function queueDay(k) {
+    if (!account()) return;
+    pending.days[k] = getPlan()[k] || null;
+    schedule();
+  }
+
+  function queueShop(week) {
+    if (!account()) return;
+    pending.shopping[week] = read(SHOP_STORE)[week] || null;
+    schedule();
+  }
+
+  function schedule() {
+    hasPending = true;
+    setStatus("saving");
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, 500);
+  }
+
+  function setupMissing(err) {
+    return !!(err && (err.status === 404 || /PGRST20[25]|42P01|42883/.test(String(err.code || "")) || /save_meal_plan|meal_plans/.test(String(err.message || ""))));
+  }
+
+  function flush() {
+    var A = account();
+    if (!A || !hasPending) return Promise.resolve();
+    var sent = pending;
+    pending = { days: {}, shopping: {} };
+    hasPending = false;
+    return A.token()
+      .then(function (t) {
+        if (!t) throw new Error("not_signed_in");
+        return window.Reviews.api("/rpc/save_meal_plan", { method: "POST", token: t, body: { p_days: sent.days, p_shopping: sent.shopping } });
+      })
+      .then(function (res) {
+        if (!res || res.ok !== true) throw new Error((res && res.error) || "failed");
+        setStatus(hasPending ? "saving" : "synced");
+      })
+      .catch(function (err) {
+        // Keep what didn't go, unless a newer change to the same day replaced it.
+        Object.keys(sent.days).forEach(function (k) {
+          if (!(k in pending.days)) pending.days[k] = sent.days[k];
+        });
+        Object.keys(sent.shopping).forEach(function (w) {
+          if (!(w in pending.shopping)) pending.shopping[w] = sent.shopping[w];
+        });
+        hasPending = true;
+        setStatus(setupMissing(err) ? "setup" : "offline");
+      });
+  }
+
+  function same(a, b) {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+
+  /* Bring this device's copy up to date with the account. Resolves true when
+     something changed (so the page should be redrawn). */
+  function pull() {
+    var A = account();
+    if (!A) return Promise.resolve(false);
+    var uid = A.userId();
+    setStatus(hasPending ? "saving" : "checking");
+    return A.token()
+      .then(function (t) {
+        if (!t || !uid) throw new Error("not_signed_in");
+        return window.Reviews.api("/meal_plans?select=plan,shopping&user_id=eq." + encodeURIComponent(uid), { token: t });
+      })
+      .then(function (rows) {
+        var row = (Array.isArray(rows) && rows[0]) || {};
+        var plan = JSON.parse(JSON.stringify(row.plan || {}));
+        var shop = JSON.parse(JSON.stringify(row.shopping || {}));
+        var localPlan = getPlan();
+        var localShop = read(SHOP_STORE);
+        if (read(SYNC_META).user !== uid) {
+          // First time on this device with this account: add anything planned
+          // here before signing in, without replacing what the account has.
+          Object.keys(localPlan).forEach(function (k) {
+            var merged = {};
+            var have = dayMeals(plan[k]);
+            MEALS.forEach(function (m) {
+              var v = have[m.key] || localPlan[k][m.key];
+              if (filled(v)) merged[m.key] = v;
+            });
+            if (!same(merged, have)) {
+              plan[k] = merged;
+              pending.days[k] = merged;
+              hasPending = true;
+            }
+          });
+          Object.keys(localShop).forEach(function (w) {
+            if (!shop[w]) {
+              shop[w] = localShop[w];
+              pending.shopping[w] = localShop[w];
+              hasPending = true;
+            }
+          });
+          write(SYNC_META, { user: uid });
+        }
+        // Changes made here that haven't gone yet win.
+        Object.keys(pending.days).forEach(function (k) {
+          if (pending.days[k]) plan[k] = pending.days[k];
+          else delete plan[k];
+        });
+        Object.keys(pending.shopping).forEach(function (w) {
+          if (pending.shopping[w]) shop[w] = pending.shopping[w];
+          else delete shop[w];
+        });
+        var normalized = {};
+        Object.keys(plan).forEach(function (k) {
+          var d = dayMeals(plan[k]);
+          if (Object.keys(d).length) normalized[k] = d;
+        });
+        var changed = !same(normalized, localPlan) || !same(shop, localShop);
+        write(PLAN_STORE, normalized);
+        write(SHOP_STORE, shop);
+        if (hasPending) flush();
+        else setStatus("synced");
+        return changed;
+      })
+      .catch(function (err) {
+        setStatus(setupMissing(err) ? "setup" : "offline");
+        return false;
+      });
+  }
+
+  function setStatus(state) {
+    syncState = state;
+    var el = document.getElementById("sync-status");
+    if (!el) return;
+    var A = account();
+    var signin = '<a href="#/signin/plan">Sign in</a>';
+    var text;
+    if (!A) {
+      text = "Saved on this device only. Contributors can " + signin.replace(">Sign in<", ">sign in<") + " to use the same plan and list on their phone and computer.";
+    } else if (state === "saving" || state === "checking") {
+      text = state === "saving" ? "Saving to your account…" : "Checking your account for changes…";
+    } else if (state === "synced") {
+      text = "Saved to your account (" + esc(A.email()) + "). Open the meal plan on any phone or computer where you’re signed in.";
+    } else if (state === "setup") {
+      text = "Saving to accounts isn’t switched on yet, so this is saved on this device only. (Run supabase/add-meal-plan-sync.sql in Supabase.)";
+    } else {
+      text = "Couldn’t reach your account just now. Your changes are saved on this device and will be sent when you’re back online.";
+    }
+    el.innerHTML = text;
+    el.className = "sync-status is-" + (A ? state : "local");
+  }
+
+  /* Draw a planner page, then refresh it from the account if signed in. */
+  function show(draw) {
+    shown = { draw: draw };
+    draw();
+    setStatus(account() ? syncState : "local");
+    if (account()) {
+      pull().then(function (changed) {
+        if (changed && shown && shown.draw === draw && document.getElementById("sync-status")) draw();
+        setStatus(syncState);
+      });
+    }
+  }
+
+  function refreshShown() {
+    if (!shown || !document.getElementById("sync-status")) {
+      shown = null;
+      return;
+    }
+    var draw = shown.draw;
+    pull().then(function (changed) {
+      if (changed && shown && shown.draw === draw && document.getElementById("sync-status")) {
+        draw();
+        setStatus(syncState);
+      }
+    });
+  }
+
+  // Back to this tab or app (phone unlocked at the store): send and fetch.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || !account()) return;
+    flush().then(refreshShown);
+  });
+  window.addEventListener("online", function () {
+    if (account()) flush().then(refreshShown);
+  });
+
+  // Signing out: the plan is safe in the account, so clear this device's copy.
+  function watchSignOut() {
+    if (!window.Auth) return;
+    window.Auth.onChange(function () {
+      if (window.Auth.signedIn()) {
+        if (shown && document.getElementById("sync-status")) refreshShown();
+        return;
+      }
+      if (read(SYNC_META).user) {
+        pending = { days: {}, shopping: {} };
+        hasPending = false;
+        write(PLAN_STORE, {});
+        write(SHOP_STORE, {});
+        write(SYNC_META, {});
+        try {
+          localStorage.removeItem(PLAN_STORE);
+          localStorage.removeItem(SHOP_STORE);
+          localStorage.removeItem(SYNC_META);
+        } catch (e) {
+          /* ignore */
+        }
+      }
+      if (shown && document.getElementById("sync-status")) {
+        shown.draw();
+        setStatus("local");
+      }
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watchSignOut);
+  else watchSignOut();
 
   function mealsIn(plan, days) {
     var n = 0;
@@ -238,6 +473,12 @@
   }
 
   function mountPlan(root, ctx) {
+    show(function () {
+      drawPlan(root, ctx);
+    });
+  }
+
+  function drawPlan(root, ctx) {
     var start = weekFrom(ctx.week);
     var startKey = dayKey(start);
     var thisWeek = dayKey(startOfWeek(today()));
@@ -269,7 +510,8 @@
     root.innerHTML =
       '<section class="plan">' +
       '<h1 class="add-title">Meal plan</h1>' +
-      '<p class="add-sub">Pick breakfast, lunch and dinner for each day (or just the ones you plan), then get the shopping list. Your plan is saved on this device.</p>' +
+      '<p class="add-sub">Pick breakfast, lunch and dinner for each day (or just the ones you plan), then get the shopping list.</p>' +
+      '<p class="sync-status" id="sync-status" role="status" aria-live="polite"></p>' +
       '<div class="week-nav">' +
       '<a class="btn btn-quiet week-step" href="#/plan/' + dayKey(addDays(start, -7)) + '" aria-label="Previous week">' + arrowL + "</a>" +
       '<div class="week-label"><strong>' + range(start) + "</strong>" +
@@ -348,7 +590,8 @@
       days.forEach(function (d) {
         clearDay(dayKey(d));
       });
-      mountPlan(root, ctx);
+      drawPlan(root, ctx);
+      setStatus(syncState);
     });
   }
 
@@ -372,9 +615,16 @@
       if (k < cutoff) delete all[k];
     });
     write(SHOP_STORE, all);
+    queueShop(week);
   }
 
   function mountShopping(root, ctx) {
+    show(function () {
+      drawShopping(root, ctx);
+    });
+  }
+
+  function drawShopping(root, ctx) {
     var start = weekFrom(ctx.week);
     var week = dayKey(start);
     var map = recipeMap(ctx.recipes);
@@ -468,6 +718,7 @@
       '<a class="back" href="#/plan/' + week + '">' + arrowL + "Meal plan</a>" +
       '<h1 class="add-title">Shopping list</h1>' +
       '<p class="add-sub">For the meals planned ' + range(start) + ". Tick anything you already have and it moves out of the way.</p>" +
+      '<p class="sync-status" id="sync-status" role="status" aria-live="polite"></p>' +
       (ctx.loading && !meals.length
         ? '<p class="loading">Loading your recipes…</p>'
         : meals.length

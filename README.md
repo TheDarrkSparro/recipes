@@ -108,7 +108,9 @@ Any recipe can be edited this way, including the ones written in `recipes.js`. F
 
 ## Meal plan and shopping list
 
-Anyone can plan the week's meals and make a shopping list. No account is needed. Everything is saved in that person's browser on that device (`localStorage`), so it doesn't follow them to another phone or computer. Clearing the browser's site data clears it.
+Anyone can plan the week's meals and make a shopping list. People who aren't signed in keep them on that device only (`localStorage`). **Signed-in contributors have them saved to their account**, so they can plan on a laptop and shop with a phone: changes go up within a second, each device picks up the latest when the page is opened or the tab is switched back to, and ticks made with no signal are sent once the phone is back online. Signing out clears that device's copy; it stays in the account. The first time someone signs in on a device, anything already planned there is added to their account.
+
+**One-time setup for saving to accounts:** in Supabase open **SQL Editor**, paste `supabase/add-meal-plan-sync.sql`, and click **Run**. It creates the `meal_plans` table (one row per account, readable only by that account) and `save_meal_plan()`, which merges only the days and weeks that changed.
 
 - **Meal plan** (`#/plan`, in the header): breakfast, lunch and dinner for each day, Sunday to Saturday, with arrows for other weeks. Pick a recipe or write a note ("Leftovers") for any meal; leave the rest empty. Recipe pages have an **Add to meal plan** button: choose the meal (breakfast recipes start on Breakfast, others on Dinner) and a day in the next 14 days.
 - **Shopping list** (`#/shopping`): every ingredient from that week's planned meals, grouped by ingredient with each recipe's amount shown side by side (amounts aren't added up, since units often differ). Tick **already have** items, add your own items, then **Print** or **Copy list**. Both leave out what's already ticked.

@@ -448,6 +448,9 @@
     email: function () {
       return session ? session.email : "";
     },
+    userId: function () {
+      return session ? claims(session.access_token).sub || "" : "";
+    },
     token: token,
     signOut: signOut,
     onChange: function (fn) {
