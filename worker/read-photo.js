@@ -136,13 +136,36 @@ async function checkOwner(env, code) {
   return typeof data.error === "string" ? data.error : "check_failed";
 }
 
+/* The key as saved in Cloudflare, with any spaces or line breaks from
+   copying removed. Returns "" if it can't be a real Claude API key. */
+export function cleanKey(raw) {
+  const key = String(raw || "").replace(/\s+/g, "");
+  return /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(key) ? key : "";
+}
+
+export function keyHint(raw) {
+  const key = String(raw || "").replace(/\s+/g, "");
+  if (/[^\x21-\x7e]/.test(key)) {
+    return "the saved ANTHROPIC_API_KEY has a character a key can't contain (often the \u2026 in the shortened key from the key list). Create a new key, copy the full key shown right after creating it, and save it again as a Secret";
+  }
+  if (!key.startsWith("sk-ant-")) {
+    return "the saved ANTHROPIC_API_KEY doesn't start with sk-ant-, so it isn't the key itself (perhaps the key's name was pasted). Save the full key again as a Secret";
+  }
+  return "the saved ANTHROPIC_API_KEY looks cut short. Create a new key, copy all of it, and save it again as a Secret";
+}
+
 async function askClaude(env, images, categories) {
+  const apiKey = cleanKey(env.ANTHROPIC_API_KEY);
+  if (!apiKey) {
+    console.log("ANTHROPIC_API_KEY is not a valid key");
+    return { error: "key_problem", detail: keyHint(env.ANTHROPIC_API_KEY) };
+  }
   let res;
   try {
     res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "x-api-key": env.ANTHROPIC_API_KEY,
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json"
       },
@@ -186,7 +209,9 @@ async function askClaude(env, images, categories) {
   if (!res.ok) {
     const msg = String((data && data.error && data.error.message) || "");
     console.log("Claude API error", res.status, msg);
-    if (res.status === 401 || res.status === 403) return { error: "key_problem" };
+    if (res.status === 401 || res.status === 403) {
+      return { error: "key_problem", detail: "Claude didn't accept the key (" + res.status + "). It may have been deleted or mistyped; create a new one and save it again as a Secret" };
+    }
     if (/credit|billing|spend/i.test(msg)) return { error: "no_credit" };
     if (res.status === 429 || res.status === 529 || res.status >= 500) return { error: "busy" };
     if (/model/i.test(msg)) return { error: "model_problem", detail: msg.slice(0, 200) };
