@@ -14,6 +14,9 @@
 --                                   saved on the site to the new name, and
 --                                   remembers the old name so recipes written in
 --                                   recipes.js follow along too.
+--   recipes_category_check          a database check: a recipe can only be
+--                                   saved with a category from the list, so the
+--                                   list can't be got around from the browser.
 
 create table if not exists public.recipe_categories (
   name          text primary key check (length(btrim(name)) between 1 and 60),
@@ -111,12 +114,6 @@ begin
     v_rows := v_rows || jsonb_build_object('name', v_name, 'sort_order', v_i, 'also_matches', to_jsonb(v_alias));
   end loop;
 
-  -- One update for all renames, so swapping two names works.
-  update public.recipes r
-  set category = m->>'new'
-  from jsonb_array_elements(v_moves) m
-  where r.category = m->>'old';
-
   delete from public.recipe_categories where true;
   insert into public.recipe_categories (name, sort_order, also_matches)
   select r->>'name', (r->>'sort_order')::integer,
@@ -125,9 +122,54 @@ begin
                where lower(a) <> all (v_seen))
   from jsonb_array_elements(v_rows) r;
 
+  -- One update for all renames, so swapping two names works. (After the new
+  -- list is in place, so the category check below accepts the new names.)
+  update public.recipes r
+  set category = m->>'new'
+  from jsonb_array_elements(v_moves) m
+  where r.category = m->>'old';
+
   return jsonb_build_object('ok', true);
 end;
 $$;
 
 revoke all on function public.owner_save_categories(jsonb) from public, anon;
 grant execute on function public.owner_save_categories(jsonb) to authenticated;
+
+-- ---------- Only categories from the list ----------
+-- New recipes, and edits that change a recipe's category, must use a name
+-- from the list. An edit that leaves an old category alone is allowed, and
+-- nothing is checked while the list is empty.
+create or replace function private.check_recipe_category()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op = 'UPDATE' and new.category is not distinct from old.category then
+    return new;
+  end if;
+  -- Saving an edit arrives as an insert of the same id first.
+  if tg_op = 'INSERT' and exists (
+    select 1 from public.recipes r
+    where r.id = new.id and r.category is not distinct from new.category
+  ) then
+    return new;
+  end if;
+  if not exists (select 1 from public.recipe_categories) then
+    return new;
+  end if;
+  if new.category is null
+     or not exists (select 1 from public.recipe_categories c where c.name = new.category) then
+    raise exception 'Category "%" is not in the category list', coalesce(new.category, '(none)')
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists recipes_category_check on public.recipes;
+create trigger recipes_category_check
+  before insert or update of category on public.recipes
+  for each row execute function private.check_recipe_category();

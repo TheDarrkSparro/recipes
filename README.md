@@ -119,7 +119,7 @@ Keep in mind that `recipes.js` is a public file, so anyone who opens it directly
 
 **One-time setup:** in Supabase open **SQL Editor** and paste `supabase/add-recipe-hiding.sql`. At the very bottom, change `YOUR-EMAIL@example.com` to the email you sign in to the site with, then click **Run**. Until then, nobody sees the hide button (`hidden: true` in `recipes.js` still works). To make someone else the owner later, run the last block of that file again with their email.
 
-How it works: `private.site_owner` holds the owner's account. The site asks `am_i_site_owner()` after sign-in, hides with `owner_set_recipe_hidden()`, and loads hidden site recipes with `owner_hidden_recipes()`; all three check the owner in the database, so the rule can't be got around from the browser. `public.hidden_recipes` is the list of hidden ids that the site reads to leave those recipes out.
+How it works: `private.site_owner` holds the owner's account. The site asks `am_i_site_owner()` after sign-in, hides with `owner_set_recipe_hidden()`, and loads hidden site recipes with `owner_hidden_recipes()`; all three check the owner in the database, so the rule can't be got around from the browser. `public.hidden_recipes` is the list of hidden ids. Nobody can read it from the site: the page only asks `hidden_among()` which of the recipes in `recipes.js` are hidden, so the names of hidden recipes added on the site never leave the database.
 
 ## Categories
 
@@ -136,7 +136,7 @@ If some recipes use a category that isn't in the list (for example an old one in
 
 **One-time setup:** run `supabase/add-recipe-hiding.sql` first (it sets the owner). Then in Supabase open **SQL Editor**, paste `supabase/add-categories.sql`, and click **Run**. It starts the list with Breakfast, Bread, Mains, Sides, Soups & Stews, Pickles and Spice Blends. Until it's run, the drop-down offers the categories recipes already use.
 
-How it works: `public.recipe_categories` holds the list (name, order, and old names in `also_matches`); anyone can read it. `owner_save_categories()` saves the whole list and checks in the database that the caller is the owner.
+How it works: `public.recipe_categories` holds the list (name, order, and old names in `also_matches`); anyone can read it. `owner_save_categories()` saves the whole list and checks in the database that the caller is the owner. A database check (`recipes_category_check`) refuses any recipe saved with a category that isn't in the list; edits that keep a recipe's existing category are still allowed.
 
 ## Barcelona tile
 

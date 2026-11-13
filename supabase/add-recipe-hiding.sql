@@ -9,9 +9,11 @@
 --
 -- What it sets up:
 --   private.site_owner            the owner's account (nobody can read it from the site).
---   public.hidden_recipes         the ids of hidden recipes. The site reads this
---                                 list to leave those recipes out; only the owner
---                                 can change it.
+--   public.hidden_recipes         the ids of hidden recipes. Nobody can read the
+--                                 list from the site; only the owner can change it.
+--   public.hidden_among(ids)      given recipe ids the site already knows (the ones
+--                                 in recipes.js), says which are hidden. It can't
+--                                 list hidden recipes, so their names never leak.
 --   public.am_i_site_owner()      lets the site ask "is the signed-in person the owner?"
 --   public.owner_set_recipe_hidden(id, hidden)
 --                                 hides or shows one recipe (owner only). Works for
@@ -56,14 +58,38 @@ create table if not exists public.hidden_recipes (
 
 alter table public.hidden_recipes enable row level security;
 
+-- No policies: the list can't be read from the site at all.
 drop policy if exists "Anyone can read hidden recipe ids" on public.hidden_recipes;
-create policy "Anyone can read hidden recipe ids"
-  on public.hidden_recipes for select
-  to anon, authenticated
-  using (true);
-
 revoke all on public.hidden_recipes from anon, authenticated;
-grant select on public.hidden_recipes to anon, authenticated;
+
+create or replace function public.recipe_is_hidden(p_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.hidden_recipes h where h.id = p_id);
+$$;
+
+create or replace function public.hidden_among(p_ids text[])
+returns text[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(array_agg(h.id), '{}')
+  from public.hidden_recipes h
+  where p_ids is not null
+    and cardinality(p_ids) <= 1000
+    and h.id = any (p_ids);
+$$;
+
+revoke all on function public.recipe_is_hidden(text) from public;
+revoke all on function public.hidden_among(text[]) from public;
+grant execute on function public.recipe_is_hidden(text) to anon, authenticated;
+grant execute on function public.hidden_among(text[]) to anon, authenticated;
 
 -- Nobody (owner included) receives hidden recipes through the normal list;
 -- the owner gets them through owner_hidden_recipes() below.
@@ -71,10 +97,7 @@ drop policy if exists "Visitors can read visible recipes" on public.recipes;
 create policy "Visitors can read visible recipes"
   on public.recipes for select
   to anon, authenticated
-  using (
-    hidden = false
-    and not exists (select 1 from public.hidden_recipes h where h.id = recipes.id)
-  );
+  using (hidden = false and not public.recipe_is_hidden(id));
 
 -- Earlier draft of this file used these names; remove them if present.
 drop function if exists public.contributor_set_recipe_hidden(text, boolean);

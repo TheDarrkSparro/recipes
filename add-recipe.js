@@ -80,7 +80,7 @@
     not_contributor: "This account can’t add or edit recipes. Ask Art to invite you from the site’s dashboard.",
     missing_title: "Give the recipe a title.",
     not_set_up: "Saving with accounts isn’t switched on yet. Run supabase/add-accounts.sql in the Supabase SQL Editor (see “Contributor accounts” in README.md).",
-    invalid_input: "Something is too long or not in the right form. Photo links must start with https://, and steps can be up to about 40,000 characters in all.",
+    invalid_input: "Something is too long or not in the right form. Photo links must start with https://, and steps can be up to about 40,000 characters in all. The category must be one from the list; if the list just changed, refresh the page.",
     network: "Couldn’t reach the recipe database. Check your connection and try again."
   };
 

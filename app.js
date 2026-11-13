@@ -130,14 +130,21 @@
     return true;
   }
 
-  /* The list of hidden recipe ids. Before supabase/add-recipe-hiding.sql has
-     been run the table doesn't exist; then nothing is hidden. */
+  /* Which recipes in recipes.js are hidden. The database only answers for ids
+     we already know, so hidden recipes added on the site never show up here
+     (they reach the owner through owner_hidden_recipes instead). Before
+     supabase/add-recipe-hiding.sql has been run, nothing is hidden. */
   function loadHiddenIds() {
-    return window.Reviews.api("/hidden_recipes?select=id&limit=1000")
-      .then(function (rows) {
+    var ids = local.map(recipeId).filter(Boolean);
+    if (!ids.length) return Promise.resolve();
+    return window.Reviews.api("/rpc/hidden_among", { method: "POST", body: { p_ids: ids } })
+      .then(function (list) {
         hiddenIds = Object.create(null);
-        (Array.isArray(rows) ? rows : []).forEach(function (r) {
-          if (r && r.id) hiddenIds[r.id] = true;
+        (Array.isArray(list) ? list : []).forEach(function (id) {
+          if (id) hiddenIds[id] = true;
+        });
+        hiddenSaved.forEach(function (r) {
+          hiddenIds[r.id] = true;
         });
       })
       .catch(function () {
@@ -171,6 +178,9 @@
               return r && r.id && r.title;
             }).map(fromRow)
           : [];
+        hiddenSaved.forEach(function (r) {
+          hiddenIds[r.id] = true;
+        });
       })
       .catch(function () {
         isOwner = false;
