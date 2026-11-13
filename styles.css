@@ -73,8 +73,11 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 
 /* ---------- Top bar ---------- */
 
+/* Barcelona paving tile (panot de flor), drawn as SVG in img/:
+   panot-red.svg  tone-on-tone on the red header
+   panot-sand.svg warm sand, for the home page photo and the footer */
 .topbar {
-  background: var(--sage);
+  background: var(--sage) url("img/panot-red.svg") 0 0 / 58px 58px;
   border-bottom: 5px solid var(--saffron);
   color: var(--paper);
   position: sticky;
@@ -194,7 +197,15 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
   outline: none;
 }
 
-.footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.92rem; }
+.footer { color: var(--muted); font-size: 0.92rem; }
+/* A strip of sidewalk along the bottom of every page. */
+.footer::before {
+  content: "";
+  display: block;
+  height: 64px;
+  border-top: 4px solid var(--saffron);
+  background: url("img/panot-sand.svg") 0 0 / 64px 64px;
+}
 .footer-inner { max-width: var(--measure); margin: 0 auto; padding: 1.25rem 1.5rem 2rem; }
 .footer p { margin: 0; }
 
@@ -210,7 +221,18 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
   margin-bottom: 2rem;
 }
 
-.intro-photo { margin: 0; justify-self: end; width: 100%; max-width: 26rem; }
+.intro-photo { margin: 0; justify-self: end; width: 100%; max-width: 26rem; position: relative; isolation: isolate; }
+/* The photo sits on a patch of paving that fades out at the edges. */
+.intro-photo::before {
+  content: "";
+  position: absolute;
+  inset: -2.25rem -2.25rem -1.25rem -2.75rem;
+  z-index: -1;
+  background: url("img/panot-sand.svg") 0 0 / 64px 64px;
+  -webkit-mask-image: radial-gradient(ellipse at 55% 50%, #000 45%, transparent 72%);
+  mask-image: radial-gradient(ellipse at 55% 50%, #000 45%, transparent 72%);
+  opacity: 0.9;
+}
 .intro-photo img {
   width: 100%;
   height: auto;

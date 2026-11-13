@@ -106,6 +106,10 @@ Any recipe can be edited this way, including the ones written in `recipes.js`. F
 
 **One-time setup:** in Supabase open **SQL Editor**, paste `supabase/add-recipe-editing.sql`, and click **Run**. Until then, saving changes says editing isn't switched on yet.
 
+## Barcelona tile
+
+The site's paving pattern is an original drawing in the spirit of Barcelona's *panot de flor* sidewalk tile. It appears tone-on-tone in the red header, as a tile bed behind the home page photo, and as a sidewalk strip above the footer. The tiles are small SVG files in `img/` (`panot-red.svg`, `panot-sand.svg`), placed by `styles.css`. To change their colors, edit the `COLORWAYS` in `img/make-panot.py` and run `python3 img/make-panot.py img`.
+
 ## Meal plan and shopping list
 
 Anyone can plan the week's meals and make a shopping list. People who aren't signed in keep them on that device only (`localStorage`). **Signed-in contributors have them saved to their account**, so they can plan on a laptop and shop with a phone: changes go up within a second, each device picks up the latest when the page is opened or the tab is switched back to, and ticks made with no signal are sent once the phone is back online. Signing out clears that device's copy; it stays in the account. The first time someone signs in on a device, anything already planned there is added to their account.
