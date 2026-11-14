@@ -1470,7 +1470,7 @@
 
   function renderAdd() {
     document.title = "Add a recipe · The Dark Sparrow Eats";
-    if (needSignIn("#/add", "Reading recipes needs no account. To add a recipe, sign in with the account you were invited to.")) return;
+    if (needSignIn("#/add", "Adding recipes is for family. Art invites family members to contribute; if you have an invitation, sign in with that account. Everyone is welcome to read and cook from the recipes.")) return;
     if (!window.AddRecipe) {
       app.innerHTML = emptyBlock("Adding recipes isn't available", "The add-recipe script didn't load. Refresh the page and try again.");
       return;
