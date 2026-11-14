@@ -119,6 +119,9 @@
     return !!(window.Auth && window.Auth.signedIn());
   }
 
+  /* The family album, Our cooks and cook profiles are for signed-in family. */
+  var FAMILY_ONLY = "The family album and cook profiles are for family. Sign in with the account you were invited to.";
+
   /* Adding and editing need a contributor sign-in; returns true when the
      sign-in page was shown instead. */
   function needSignIn(next, reason) {
@@ -1232,7 +1235,11 @@
     return (
       '<div class="contrib" id="contrib">' +
       (name
-        ? '<p class="contrib-line">Contributed by <a class="contrib-name" href="' + esc(cookHref(name)) + '">' + esc(name) + "</a></p>" +
+        ? '<p class="contrib-line">Contributed by ' +
+          (signedIn()
+            ? '<a class="contrib-name" href="' + esc(cookHref(name)) + '">' + esc(name) + "</a>"
+            : '<span class="contrib-name">' + esc(name) + "</span>") +
+          "</p>" +
           '<p class="print-only print-kitchen">From the kitchen of <strong>' + esc(name) + "</strong></p>"
         : '<p class="contrib-line contrib-empty">No contributor set</p>') +
       (owner
@@ -1419,13 +1426,16 @@
     if (!p) return "";
     return (
       '<figure class="intro-photo is-family">' +
-      '<a class="intro-photo-link" href="#/family">' + photoImg(p, true) + "</a>" +
-      '<figcaption><a href="#/family">From the family album</a></figcaption>' +
+      (signedIn()
+        ? '<a class="intro-photo-link" href="#/family">' + photoImg(p, true) + "</a>" +
+          '<figcaption><a href="#/family">From the family album</a></figcaption>'
+        : photoImg(p, true)) +
       "</figure>"
     );
   }
 
   function renderFamily() {
+    if (needSignIn(location.hash, FAMILY_ONLY)) return;
     document.title = "Family album · The Dark Sparrow Eats";
     var list = familyPhotos();
     app.innerHTML =
@@ -1676,6 +1686,7 @@
   }
 
   function renderCooks() {
+    if (needSignIn(location.hash, FAMILY_ONLY)) return;
     document.title = "Our cooks · The Dark Sparrow Eats";
     if (!allLoaded) {
       app.innerHTML = '<p class="loading">Gathering the cooks…</p>';
@@ -1946,6 +1957,7 @@
   }
 
   function renderCookProfile(rawName) {
+    if (needSignIn(location.hash, FAMILY_ONLY)) return;
     var name = str(rawName);
     document.title = name + " · The Dark Sparrow Eats";
     if (!allLoaded) {

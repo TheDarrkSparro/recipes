@@ -427,6 +427,8 @@
     /* The "How to add and edit recipes" footer link is for contributors only. */
     var guide = document.getElementById("footer-guide-link");
     if (guide) guide.hidden = !session;
+    /* Family and Cooks links (class "members-only") show only to signed-in family. */
+    document.body.classList.toggle("is-signed-in", !!session);
     var el = document.getElementById("footer-account");
     if (!el) return;
     if (session) {
@@ -436,7 +438,7 @@
         ' · <button type="button" class="link-btn" id="sign-out">Sign out</button>';
       el.querySelector("#sign-out").addEventListener("click", function () {
         signOut();
-        if (/^#\/(add|edit\/|me|profiles)/.test(location.hash)) location.hash = "#/";
+        if (/^#\/(add|edit\/|me|profiles|family|cooks|cook\/)/.test(location.hash)) location.hash = "#/";
       });
     } else {
       el.innerHTML = '<a href="#/signin">Contributor sign in</a>';

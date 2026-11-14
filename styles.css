@@ -1950,3 +1950,6 @@ img.cook-avatar { object-fit: cover; padding: 0; }
   .hy-tabs, .hy-presets, .hy-reset, .hy-basis { display: none !important; }
   .hy-out { position: static; }
 }
+
+/* Family album and Our cooks are for signed-in family (auth.js sets body.is-signed-in). */
+body:not(.is-signed-in) .members-only { display: none !important; }
