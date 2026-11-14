@@ -424,6 +424,9 @@
 
   /* "Signed in as … · Sign out" / "Contributor sign in" in the footer. */
   function paintAccount() {
+    /* The "How to add and edit recipes" footer link is for contributors only. */
+    var guide = document.getElementById("footer-guide-link");
+    if (guide) guide.hidden = !session;
     var el = document.getElementById("footer-account");
     if (!el) return;
     if (session) {
