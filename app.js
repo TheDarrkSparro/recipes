@@ -781,7 +781,7 @@
     app.innerHTML =
       '<section class="intro">' +
       '<div class="intro-text">' +
-      '<h1 class="intro-title">Recipes from the Dark Sparrow kitchen</h1>' +
+      '<h1 class="intro-title">Recipes from the Dark Sparrow Kitchen</h1>' +
       '<p class="intro-sub">Sourdough, the smoker, a jar of Herbes de Provence, and the comfort food in between. What you cook, kept simply.</p>' +
       '<form class="search" role="search" id="search-form">' +
       '<label class="sr-only" for="search">Search recipes</label>' +
