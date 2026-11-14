@@ -2008,3 +2008,74 @@ body:not(.is-signed-in) .members-only { display: none !important; }
   .hy-sheet-notes p { margin: 0.04in 0 0.06in; font-size: 9.5pt; color: #3e4c59; }
   .hy-sheet-foot { margin: 0.14in 0 0; text-align: center; font-size: 8pt; color: #8a7f6c; }
 }
+
+/* ---------- Color schemes (theme.js sets <html data-theme="...">) ----------
+   Red & Gold is the default (the :root colors at the top of this file).
+   Printed recipes keep the red and gold whatever scheme is chosen. */
+
+[data-theme="basque"] {
+  --sage: #00753a;        /* Basque green */
+  --sage-deep: #005a2c;
+  --saffron: #d52b1e;     /* Basque red */
+  --saffron-wash: #e4f1e8;
+  --paper: #f8f8f3;
+  --line: #dde3d6;
+  --line-soft: #ecf0e6;
+  --danger: #a3241a;
+}
+[data-theme="basque"] .topbar { background-image: url("img/panot-green.svg"); }
+[data-theme="basque"] .hue-sage  { --hue: #00753a; }
+[data-theme="basque"] .hue-slate { --hue: #b5261c; }
+[data-theme="basque"] .hue-rust  { --hue: #d52b1e; }
+[data-theme="basque"] .hue-ochre { --hue: #2e7d4f; }
+[data-theme="basque"] .hue-plum  { --hue: #005a2c; }
+[data-theme="basque"] .hue-teal  { --hue: #8a1d14; }
+[data-theme="basque"] .hue-olive { --hue: #1f8f4e; }
+[data-theme="basque"] .tab.is-on .tab-n { color: #cfe8d7; }
+[data-theme="basque"] .top-mark { color: #005a2c; }
+
+[data-theme="ink"] {
+  --sage: #1f3a5f;        /* deep ink blue */
+  --sage-deep: #152a45;
+  --saffron: #d08a3c;     /* copper */
+  --saffron-wash: #f6e7d4;
+  --paper: #f7f5f0;
+  --line: #e2dccf;
+  --line-soft: #efebe2;
+  --danger: #8f2d1f;
+}
+[data-theme="ink"] .topbar { background-image: url("img/panot-ink.svg"); }
+[data-theme="ink"] .hue-sage  { --hue: #1f3a5f; }
+[data-theme="ink"] .hue-slate { --hue: #a8642a; }
+[data-theme="ink"] .hue-rust  { --hue: #c0662b; }
+[data-theme="ink"] .hue-ochre { --hue: #3d5a80; }
+[data-theme="ink"] .hue-plum  { --hue: #152a45; }
+[data-theme="ink"] .hue-teal  { --hue: #8a4f1c; }
+[data-theme="ink"] .hue-olive { --hue: #2b4c74; }
+[data-theme="ink"] .tab.is-on .tab-n { color: #f3c99a; }
+[data-theme="ink"] .top-mark { color: #7a4a17; }
+
+[data-theme="basque"] .nav-link,
+[data-theme="ink"] .nav-link { color: rgba(255, 255, 255, 0.86); }
+
+/* Footer picker */
+.footer-theme { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.75rem; margin-top: 0.7rem !important; }
+.theme-label { font-size: 0.88rem; color: var(--muted); }
+.theme-swatches { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; }
+.theme-swatch {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem 0.25rem 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--slate);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.theme-swatch:hover { color: var(--ink); border-color: var(--muted); }
+.theme-swatch.is-on { border-color: var(--sage); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--sage); }
+.theme-dot { width: 1.15rem; height: 1.15rem; border-radius: 50%; flex: none; }
+@media print { .footer-theme { display: none !important; } }
