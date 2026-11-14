@@ -15,7 +15,7 @@
 
   var DEFAULTS = {
     tab: "plan",
-    name: "Sourdough loaf",
+    name: "Sourdough Loaf",
     basis: "flour",        // "flour" or "dough"
     flour: "1000",
     loaves: "2",
@@ -43,6 +43,7 @@
     try { s = JSON.parse(localStorage.getItem(STORE) || "{}") || {}; } catch (e) { s = {}; }
     var out = {};
     for (var k in DEFAULTS) out[k] = typeof s[k] === "string" ? s[k] : DEFAULTS[k];
+    if (out.name === "Sourdough loaf") out.name = DEFAULTS.name; // older default, now capitalized
     return out;
   }
 
@@ -165,7 +166,7 @@
     return (
       '<div class="hy-field hy-name">' +
       '<label for="hy-name">Name this bake</label>' +
-      '<input id="hy-name" data-k="name" type="text" autocomplete="off" maxlength="80" value="' + esc(s.name) + '" placeholder="Sourdough loaf">' +
+      '<input id="hy-name" data-k="name" type="text" autocomplete="off" maxlength="80" value="' + esc(s.name) + '" placeholder="Sourdough Loaf">' +
       "</div>" +
       '<div class="hy-basis" role="radiogroup" aria-label="Start from">' +
       '<label><input type="radio" name="hy-basis" value="flour"' + (s.basis !== "dough" ? " checked" : "") + "> Flour weight</label>" +
@@ -234,7 +235,7 @@
     var loaves = s.basis === "dough" ? Math.max(1, Math.round(num(s.loaves) || 1)) : 1;
     var perLoaf = r.dough / loaves;
     var holdBack = Math.min(r.water, Math.round((r.totalFlour * 0.05) / 5) * 5);
-    var name = String(s.name || "").trim() || "Sourdough loaf";
+    var name = String(s.name || "").trim() || "Sourdough Loaf";
     var today = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
     var makes = "Makes " + wholeGrams(r.dough) + " of dough" +
       (loaves > 1 ? " (" + loaves + " loaves of about " + wholeGrams(perLoaf) + ")" : " (1 loaf)");
