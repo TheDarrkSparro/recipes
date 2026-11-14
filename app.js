@@ -860,6 +860,11 @@
 
   var shownRecipe = null;
 
+  function isSourdough(recipe, cat, tags, ingredients) {
+    var text = [titleOf(recipe), cat].concat(tags, ingredients).join(" ").toLowerCase();
+    return /sourdough|levain|starter/.test(text);
+  }
+
   function renderDetail(id) {
     var recipe = findRecipe(id);
     shownRecipe = recipe;
@@ -924,6 +929,11 @@
       '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5.5 7V3h9v4M5.5 14h-2V8.5a1.5 1.5 0 0 1 1.5-1.5h10a1.5 1.5 0 0 1 1.5 1.5V14h-2M5.5 11.5h9V17h-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
       "Print</button>" +
       '<span class="plan-add" id="plan-add"></span>' +
+      (isSourdough(recipe, cat, tags, ingredients)
+        ? '<a class="btn btn-quiet" href="#/hydration">' +
+          '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 3.5c2.6 3.2 4.5 5.8 4.5 8.2a4.5 4.5 0 0 1-9 0c0-2.4 1.9-5 4.5-8.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
+          "Hydration calculator</a>"
+        : "") +
       (wakeSupported()
         ? '<label class="wake-switch"><input type="checkbox" role="switch" id="wake-toggle"' + (wake.want ? " checked" : "") + ">" +
           '<span class="wake-track" aria-hidden="true"><span class="wake-thumb"></span></span>' +
@@ -2721,6 +2731,7 @@
     var plan = hash.match(/^\/?(plan|shopping)(?:\/(\d{4}-\d{2}-\d{2}))?\/?$/);
     if (plan) return { name: plan[1], week: plan[2] || "" };
     if (/^\/?set-password\/?$/.test(hash)) return { name: "set-password" };
+    if (/^\/?(hydration|sourdough-calculator)\/?$/.test(hash)) return { name: "hydration" };
     var match = hash.match(/^\/?recipe\/([^/]+)\/?$/);
     if (match) return { name: "detail", id: match[1] };
     var edit = hash.match(/^\/?edit\/([^/]+)\/?$/);
@@ -2743,6 +2754,7 @@
     if (current.name !== "detail") releaseWake();
     document.body.setAttribute("data-view", current.name);
     markNav();
+    if (window.Hydration) window.Hydration.unmount(app);
     if (current.name === "detail") renderDetail(current.id);
     else if (current.name === "add") renderAdd();
     else if (current.name === "family") renderFamily();
@@ -2754,6 +2766,10 @@
     else if (current.name === "profile-edit" || current.name === "profile-new") renderOwnerProfileForm(current.name === "profile-new", current.id);
     else if (current.name === "edit") renderEdit(current.id);
     else if (current.name === "plan" || current.name === "shopping") renderPlanner(current.name, current.week);
+    else if (current.name === "hydration") {
+      if (window.Hydration) window.Hydration.mount(app);
+      else app.innerHTML = emptyBlock("The calculator isn't available", "Its script didn't load. Refresh the page and try again.");
+    }
     else if (current.name === "signin") {
       if (window.Auth)
         window.Auth.renderSignIn(
