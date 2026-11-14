@@ -41,6 +41,9 @@ COLORWAYS = {
     "panot-red": dict(joint="#97121a", shade="#9e131b", light="#b31e26", face="#aa151b", groove="#98121a", w=2.2),
     # warm sand, like the pavement in the photo but light enough for a page
     "panot-sand": dict(joint="#d7c3a4", shade="#dfcdb1", light="#f8efdf", face="#efe2cb", groove="#d6bf9c", w=2.2),
+    # header tiles for the other color schemes (theme.js)
+    "panot-green": dict(joint="#006834", shade="#006d36", light="#127f48", face="#00753a", groove="#006934", w=2.2),
+    "panot-ink": dict(joint="#1c3455", shade="#1d3658", light="#2f486a", face="#1f3a5f", groove="#1c3455", w=2.2),
 }
 
 if __name__ == "__main__":
