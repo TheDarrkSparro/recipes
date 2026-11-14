@@ -1953,3 +1953,58 @@ img.cook-avatar { object-fit: cover; padding: 0; }
 
 /* Family album and Our cooks are for signed-in family (auth.js sets body.is-signed-in). */
 body:not(.is-signed-in) .members-only { display: none !important; }
+
+/* ---------- Hydration calculator: name field, print button, printed recipe ---------- */
+
+.hy-name { margin-bottom: 1rem; }
+.hy-name input {
+  width: 100%;
+  border: 1px solid #c9cfc8;
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 0.65rem 0.8rem;
+  font-size: 1.05rem;
+}
+.hy-name input:focus { outline: none; border-color: var(--saffron); box-shadow: var(--focus); }
+.hy-print-row { margin: 1.1rem 0 0; }
+
+@media print {
+  .hy.is-plan .hy-head, .hy.is-plan .hy-tabs, .hy.is-plan .hy-body, .hy.is-plan .hy-reset { display: none !important; }
+  .hy:not(.is-plan) .hy-sheet { display: none !important; }
+  .hy { max-width: none; }
+
+  .hy-sheet-head { text-align: center; margin: 0 0 0.14in; }
+  .hy-sheet-head h2 { font-family: var(--serif); font-size: 24pt; line-height: 1.1; margin: 0 0 0.04in; color: #1d2327; }
+  .hy-sheet-head p { margin: 0; color: #3e4c59; font-size: 10.5pt; }
+
+  .hy-sheet h3 {
+    font-family: var(--serif); font-size: 12pt; color: #8c1116;
+    margin: 0 0 0.06in; padding-bottom: 0.03in; border-bottom: 2px solid #f1bf00;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .hy-sheet-cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 0.25in; margin-bottom: 0.16in; break-inside: avoid; }
+
+  .hy-sheet-ing table { width: 100%; border-collapse: collapse; font-size: 11pt; }
+  .hy-sheet-ing td, .hy-sheet-ing th { padding: 0.06in 0.04in; border-bottom: 1px solid #e8dcc6; text-align: left; vertical-align: middle; }
+  .hy-sheet-ing th { font-weight: 600; }
+  .hy-sheet-ing th small { font-weight: 400; color: #5b6670; font-size: 8.5pt; }
+  .hy-sheet-ing td:nth-child(3) { font-family: var(--serif); font-weight: 700; font-size: 13pt; text-align: right; white-space: nowrap; }
+  .hy-sheet-ing td:nth-child(4) { color: #5b6670; font-size: 9pt; text-align: right; white-space: nowrap; }
+  .hy-tick { width: 0.22in; }
+  .hy-tick span { display: inline-block; width: 0.13in; height: 0.13in; border: 1.3px solid #8c1116; border-radius: 2px; }
+
+  .hy-sheet-pct { background: #fdf1c4; border-left: 3px solid #f1bf00; padding: 0.08in 0.12in; border-radius: 0 4px 4px 0; }
+  .hy-sheet-pct dl { margin: 0; }
+  .hy-sheet-pct dl div { display: flex; justify-content: space-between; padding: 0.025in 0; font-size: 10pt; }
+  .hy-sheet-pct dd { margin: 0; font-weight: 700; }
+  .hy-sheet-pct p { margin: 0.05in 0 0; font-size: 8pt; color: #5c4300; font-style: italic; }
+
+  .hy-sheet-method { margin-bottom: 0.14in; }
+  .hy-sheet-method ol { margin: 0; padding-left: 0.22in; }
+  .hy-sheet-method li { margin: 0 0 0.05in; line-height: 1.4; break-inside: avoid; }
+  .hy-sheet-method li strong { color: #8c1116; }
+
+  .hy-sheet-notes { break-inside: avoid; }
+  .hy-sheet-notes p { margin: 0.04in 0 0.06in; font-size: 9.5pt; color: #3e4c59; }
+  .hy-sheet-foot { margin: 0.14in 0 0; text-align: center; font-size: 8pt; color: #8a7f6c; }
+}

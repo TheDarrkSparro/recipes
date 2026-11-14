@@ -15,6 +15,7 @@
 
   var DEFAULTS = {
     tab: "plan",
+    name: "Sourdough loaf",
     basis: "flour",        // "flour" or "dough"
     flour: "1000",
     loaves: "2",
@@ -162,6 +163,10 @@
 
   function planForm(s) {
     return (
+      '<div class="hy-field hy-name">' +
+      '<label for="hy-name">Name this bake</label>' +
+      '<input id="hy-name" data-k="name" type="text" autocomplete="off" maxlength="80" value="' + esc(s.name) + '" placeholder="Sourdough loaf">' +
+      "</div>" +
       '<div class="hy-basis" role="radiogroup" aria-label="Start from">' +
       '<label><input type="radio" name="hy-basis" value="flour"' + (s.basis !== "dough" ? " checked" : "") + "> Flour weight</label>" +
       '<label><input type="radio" name="hy-basis" value="dough"' + (s.basis === "dough" ? " checked" : "") + "> Finished dough weight</label>" +
@@ -205,7 +210,81 @@
       row("Total flour", grams(r.totalFlour), "incl. " + grams(r.starterFlour) + " in starter") +
       row("Total water", grams(r.totalWater), "incl. " + grams(r.starterWater) + " in starter") +
       "</dl>" +
-      '<p class="hy-feel"><strong>' + pct(num(s.hydration)) + "</strong> " + esc(feel(num(s.hydration))) + "</p>"
+      '<p class="hy-feel"><strong>' + pct(num(s.hydration)) + "</strong> " + esc(feel(num(s.hydration))) + "</p>" +
+      (r.water >= 0
+        ? '<p class="hy-print-row"><button type="button" class="btn" data-print-recipe="1">' +
+          '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M5.5 7V3h9v4M5.5 14h-2V8.5a1.5 1.5 0 0 1 1.5-1.5h10a1.5 1.5 0 0 1 1.5 1.5V14h-2M5.5 11.5h9V17h-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>' +
+          "Print as a recipe</button></p>"
+        : "")
+    );
+  }
+
+  /* ---------- Printable recipe card ---------- */
+
+  var SPARROW = '<svg class="print-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="currentColor" d="M10 29.5c2.2-5.6 7-9.3 13.2-9.6 1.4-3.4 4.4-5.4 7.8-5.1 1.6.1 2.9.8 3.8 1.8l4.2.6-3.4 2.1c.3 3.7-1.4 7-4.6 9.1l7.5 6.1-9.6-2.5c-2.6 1.4-5.7 1.9-8.9 1.4-3.4-.5-6.5-2-8.9-3.9h-1.1z"></path></svg>';
+
+  function wholeGrams(n) {
+    return Math.round(n).toLocaleString() + " g";
+  }
+
+  function sheetHtml(s) {
+    var r = plan(s);
+    if (!r || r.water < 0) return "";
+    var H = num(s.hydration);
+    var loaves = s.basis === "dough" ? Math.max(1, Math.round(num(s.loaves) || 1)) : 1;
+    var perLoaf = r.dough / loaves;
+    var holdBack = Math.min(r.water, Math.round((r.totalFlour * 0.05) / 5) * 5);
+    var name = String(s.name || "").trim() || "Sourdough loaf";
+    var today = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    var makes = "Makes " + wholeGrams(r.dough) + " of dough" +
+      (loaves > 1 ? " (" + loaves + " loaves of about " + wholeGrams(perLoaf) + ")" : " (1 loaf)");
+
+    function ing(label, g, note) {
+      return "<tr><td class=\"hy-tick\"><span></span></td><th>" + label +
+        (note ? " <small>" + esc(note) + "</small>" : "") + "</th><td>" + esc(wholeGrams(g)) + "</td><td>" + esc(ounces(g)) + "</td></tr>";
+    }
+
+    var steps = [
+      ["Mix", "Stir the " + wholeGrams(r.flour) + " flour with all but " + wholeGrams(holdBack) + " of the water until no dry bits remain. Cover and rest 30 to 60 minutes."],
+      ["Add starter and salt", "Add the " + wholeGrams(r.starter) + " active starter, the " + wholeGrams(r.salt) + " salt and the held-back water. Squeeze and fold until fully combined."],
+      ["Bulk rise", "Over the first 2 hours, do 4 sets of stretch-and-folds, 30 minutes apart. Let rise until about 50% bigger, domed and bubbly, usually 4 to 6 hours at 75\u00b0F."],
+      ["Shape", (loaves > 1 ? "Divide into " + loaves + " pieces of about " + wholeGrams(perLoaf) + ". " : "") + "Pre-shape, rest 20 minutes, then shape tight and set seam-up in a floured banneton."],
+      ["Proof", "Cover and refrigerate 8 to 16 hours."],
+      ["Bake", "Heat the oven with a Dutch oven inside to 500\u00b0F. Score, bake covered 20 minutes, then uncover, lower to 450\u00b0F and bake 20 to 25 minutes more, until deep brown (about 208\u00b0F inside). Cool at least an hour before slicing."]
+    ];
+    if (H >= 80) steps[3][1] += " At this hydration, wet hands and a bench scraper help.";
+
+    return (
+      '<div class="print-brand">' + SPARROW +
+      '<span class="print-brand-name">The Dark Sparrow Eats</span>' +
+      '<span class="print-brand-tag">Home cooking, written down to cook from</span>' +
+      "</div>" +
+      '<header class="hy-sheet-head">' +
+      "<h2>" + esc(name) + "</h2>" +
+      "<p>Sourdough \u00b7 " + esc(pct(H)) + " hydration \u00b7 " + esc(makes) + "</p>" +
+      "</header>" +
+      '<div class="hy-sheet-cols">' +
+      '<section class="hy-sheet-ing"><h3>Ingredients</h3>' +
+      '<table><tbody>' +
+      ing("Flour", r.flour) +
+      ing("Water", r.water, "lukewarm") +
+      ing("Active starter", r.starter, pct(num(s.starterHyd)) + " hydration") +
+      ing("Salt", r.salt) +
+      "</tbody></table></section>" +
+      '<section class="hy-sheet-pct"><h3>Baker\u2019s percentages</h3><dl>' +
+      "<div><dt>Hydration</dt><dd>" + esc(pct(H)) + "</dd></div>" +
+      "<div><dt>Salt</dt><dd>" + esc(pct(num(s.salt))) + "</dd></div>" +
+      "<div><dt>Starter</dt><dd>" + esc(pct(num(s.starterPct))) + "</dd></div>" +
+      "<div><dt>Total flour</dt><dd>" + esc(wholeGrams(r.totalFlour)) + "</dd></div>" +
+      "<div><dt>Total water</dt><dd>" + esc(wholeGrams(r.totalWater)) + "</dd></div>" +
+      "</dl><p>Totals include the flour and water inside the starter.</p></section>" +
+      "</div>" +
+      '<section class="hy-sheet-method"><h3>Method</h3><ol>' +
+      steps.map(function (st) { return "<li><strong>" + esc(st[0]) + ".</strong> " + esc(st[1]) + "</li>"; }).join("") +
+      "</ol></section>" +
+      '<section class="hy-sheet-notes"><h3>Bake notes</h3><p>Date ________ Room temp ______ Bulk ______ Proof ______</p>' +
+      '<div class="print-lines"><span></span><span></span><span></span></div></section>' +
+      '<p class="hy-sheet-foot">Printed ' + esc(today) + " from The Dark Sparrow Eats \u00b7 darksparroweats.com/#/hydration \u00b7 On egin!</p>"
     );
   }
 
@@ -249,7 +328,7 @@
         '<a class="back" href="#/">' +
         '<svg class="i" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.5 5L6.5 10l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
         "All recipes</a>" +
-        '<section class="hy">' +
+        '<section class="hy' + (s.tab === "plan" ? " is-plan" : "") + '">' +
         '<header class="hy-head">' +
         '<h1 class="hy-title">Sourdough hydration calculator</h1>' +
         '<p class="hy-sub">Hydration is the water as a share of the flour. Starter counts too: its flour and water are part of the dough.</p>' +
@@ -263,12 +342,15 @@
         '<div class="hy-out" aria-live="polite">' + (s.tab === "check" ? checkResult(s) : planResult(s)) + "</div>" +
         "</div>" +
         '<p class="hy-reset"><button type="button" class="link-btn" data-reset="1">Reset to defaults</button></p>' +
+        '<div class="print-only hy-sheet" aria-hidden="true">' + (s.tab === "plan" ? sheetHtml(s) : "") + "</div>" +
         "</section>";
     }
 
     function refreshOutput() {
       var out = app.querySelector(".hy-out");
       if (out) out.innerHTML = s.tab === "check" ? checkResult(s) : planResult(s);
+      var sheet = app.querySelector(".hy-sheet");
+      if (sheet) sheet.innerHTML = s.tab === "plan" ? sheetHtml(s) : "";
       Array.prototype.forEach.call(app.querySelectorAll(".hy-chip"), function (b) {
         b.classList.toggle("is-on", num(b.getAttribute("data-preset")) === num(s.hydration));
       });
@@ -296,9 +378,12 @@
     };
 
     app.onclick = function (e) {
-      var t = e.target.closest ? e.target.closest("[data-tab],[data-preset],[data-reset]") : null;
+      var t = e.target.closest ? e.target.closest("[data-tab],[data-preset],[data-reset],[data-print-recipe]") : null;
       if (!t) return;
-      if (t.hasAttribute("data-tab")) {
+      if (t.hasAttribute("data-print-recipe")) {
+        refreshOutput();
+        window.print();
+      } else if (t.hasAttribute("data-tab")) {
         s.tab = t.getAttribute("data-tab");
         save(s);
         render();
