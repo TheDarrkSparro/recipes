@@ -582,6 +582,55 @@
     return canonicalCategory(recipe.category) || "Other";
   }
 
+  /* ---------- Category placeholder pictures (img/placeholders) ----------
+     A recipe with no photo of its own shows the picture for its category.
+     Names are matched loosely ("Bread" and "Breads", "Mains" and "Main
+     Dishes"), and a hidden recipe uses the category it really belongs to.
+     A category with no picture of its own gets the "Family Recipe" one.
+     To add a picture for a new category: drop an 800x800 .webp in
+     img/placeholders and add its name (lower case, & written as "and")
+     to the list below. */
+  var PLACEHOLDER_DIR = "img/placeholders/";
+  var PLACEHOLDERS = {
+    "appetizers": ["appetizer", "starters", "starter", "snacks", "snack", "apps"],
+    "beverages": ["beverage", "drinks", "drink", "cocktails"],
+    "breads": ["bread", "baking", "baked goods"],
+    "breakfast": ["breakfasts", "brunch"],
+    "desserts": ["dessert", "sweets", "baked sweets", "cookies", "cakes"],
+    "main-dishes": ["mains", "main", "main dish", "entrees", "entree", "dinner", "dinners"],
+    "pickles": ["pickle", "pickling", "preserves", "canning", "ferments"],
+    "salads": ["salad"],
+    "sauces-and-dressings": ["sauces", "sauce", "dressings", "dressing", "sauces and dressings", "condiments"],
+    "side-dishes": ["sides", "side", "side dish"],
+    "soups-and-stews": ["soups", "soup", "stews", "stew", "soups and stews", "chili"],
+    "spice-blends": ["spice blend", "spices", "spice mixes", "seasonings", "rubs"]
+  };
+  var PLACEHOLDER_DEFAULT = "family-recipe";
+  var placeholderIndex = (function () {
+    var map = Object.create(null);
+    Object.keys(PLACEHOLDERS).forEach(function (file) {
+      map[file.replace(/-/g, " ")] = file;
+      PLACEHOLDERS[file].forEach(function (alias) {
+        map[alias] = file;
+      });
+    });
+    return map;
+  })();
+
+  function placeholderKey(name) {
+    return str(name)
+      .toLowerCase()
+      .replace(/&/g, " and ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  function placeholderFor(recipe) {
+    var cat = canonicalCategory(recipe.category);
+    var file = placeholderIndex[placeholderKey(cat)] || PLACEHOLDER_DEFAULT;
+    return PLACEHOLDER_DIR + file + ".webp";
+  }
+
   /* ---------- Ratings (from reviews.js) ---------- */
 
   var statsMap = null;
@@ -693,7 +742,9 @@
     var inner =
       '<span class="card-tab">' + esc(cat) + "</span>" +
       '<span class="card-face">' +
-      (image ? '<span class="card-photo"><img src="' + esc(image) + '" alt="" loading="lazy"></span>' : "") +
+      (image
+        ? '<span class="card-photo"><img src="' + esc(image) + '" alt="" loading="lazy" data-fallback="' + esc(placeholderFor(recipe)) + '"></span>'
+        : '<span class="card-photo is-placeholder"><img src="' + esc(placeholderFor(recipe)) + '" alt="" loading="lazy"></span>') +
       (top ? '<span class="top-mark"><span aria-hidden="true">★</span> Top rated</span>' : "") +
       '<span class="card-title">' + esc(titleOf(recipe)) + "</span>" +
       '<span class="card-facts">' +
@@ -983,7 +1034,9 @@
       '<p class="wake-msg" id="wake-msg" role="status" hidden></p>' +
       '<p class="visibility-msg" id="visibility-msg" role="status" hidden></p>' +
       "</header>" +
-      (image ? '<figure class="photo"><img src="' + esc(image) + '" alt=""></figure>' : "") +
+      (image
+        ? '<figure class="photo"><img src="' + esc(image) + '" alt="" data-fallback="' + esc(placeholderFor(recipe)) + '"></figure>'
+        : '<figure class="photo is-placeholder"><img src="' + esc(placeholderFor(recipe)) + '" alt=""></figure>') +
       '<div class="recipe-body">' +
       '<section class="ingredients-box" aria-labelledby="ing-h">' +
       '<div class="box-head"><h2 id="ing-h">Ingredients</h2>' +
@@ -2837,6 +2890,15 @@
     function (event) {
       var target = event.target;
       if (!target || target.tagName !== "IMG") return;
+      // A recipe photo that won't load falls back to its category picture.
+      var fallback = target.getAttribute("data-fallback");
+      if (fallback) {
+        target.removeAttribute("data-fallback");
+        var holder = target.closest("figure, .card-photo");
+        if (holder) holder.classList.add("is-placeholder");
+        target.src = fallback;
+        return;
+      }
       var frame = target.closest("figure, .card-photo");
       if (frame) frame.remove();
     },

@@ -105,6 +105,14 @@ If some recipes use a category that isn't in the list (for example an old one in
 
 How it works: `public.recipe_categories` holds the list (name, order, and old names in `also_matches`); anyone can read it. `owner_save_categories()` saves the whole list and checks in the database that the caller is the owner. A database check (`recipes_category_check`) refuses any recipe saved with a category that isn't in the list; edits that keep a recipe's existing category are still allowed.
 
+### Category pictures (recipes without a photo)
+
+A recipe with no photo shows a standard picture for its category, on its card and on its page. Recipes with their own photo are unchanged; if a recipe's photo link ever breaks, the category picture shows instead.
+
+The pictures are in `img/placeholders/` (800×800 WebP): Appetizers, Beverages, Breads, Breakfast, Desserts, Main Dishes, Pickles, Salads, Sauces & Dressings, Side Dishes, Soups & Stews, Spice Blends, and a **Family Recipe** picture for "Other" and any category without its own. Names match loosely, so "Bread" uses `breads.webp`, "Mains" uses `main-dishes.webp`, and "Sides" uses `side-dishes.webp`.
+
+**Picture for a new category:** add `your-category.webp` to `img/placeholders/`, then add it to the `PLACEHOLDERS` list in `app.js` (search for `PLACEHOLDERS`), with any other names it should match.
+
 ## Contributors
 
 Each recipe can show **Contributed by …** under its title, for example "Contributed by Grandma Garro". Only the site owner can set or change that name; everyone sees it.
