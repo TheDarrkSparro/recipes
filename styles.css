@@ -117,6 +117,25 @@ code { font-size: 0.9em; background: var(--line-soft); padding: 0.05em 0.35em; b
 
 .topnav { display: flex; align-items: center; gap: 0.4rem; flex: none; }
 
+/* "Welcome back, Art" for signed-in contributors (app.js paintGreeting). */
+.topbar-greeting {
+  margin-left: auto;
+  color: #f8dfe0;
+  font-size: 0.95rem;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius);
+}
+.topbar-greeting strong { color: #fff; font-weight: 600; }
+.topbar-greeting:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.topbar-greeting[hidden] { display: none; }
+.topbar-greeting .greet-short { display: none; }
+@media (max-width: 1000px) {
+  .topbar-greeting .greet-long { display: none; }
+  .topbar-greeting .greet-short { display: inline; }
+}
+
 .nav-link {
   text-decoration: none;
   padding: 0.45rem 0.75rem;
@@ -1787,7 +1806,8 @@ img.cook-avatar { object-fit: cover; padding: 0; }
 
 @media (max-width: 640px) {
   .topbar-inner { flex-wrap: wrap; row-gap: 0.3rem; padding: 0.55rem 0.75rem 0.45rem; }
-  .brand { flex: 1 1 100%; gap: 0.5rem; }
+  .brand { flex: 1 1 0; gap: 0.5rem; }
+  .topbar-greeting { flex: none; font-size: 0.9rem; padding: 0.25rem 0.4rem; margin-right: -0.4rem; }
   .brand-name { font-size: 1.1rem; }
   .mark { width: 1.9rem; height: 1.9rem; }
   .topnav {
