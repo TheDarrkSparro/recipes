@@ -295,7 +295,34 @@
       });
   }
 
+  /* "Welcome back, Art" in the header for signed-in contributors. The first
+     name comes from the cook profile linked to their account; with no linked
+     profile yet it just says "Welcome back". */
+  function paintGreeting() {
+    var el = document.getElementById("topbar-greeting");
+    if (!el) return;
+    if (!signedIn()) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    var first = "";
+    Object.keys(profilesByName).forEach(function (k) {
+      var p = profilesByName[k];
+      if (!first && p && familyById[p.id] && familyById[p.id].is_me) first = str(p.name).split(/\s+/)[0];
+    });
+    el.innerHTML = first
+      ? '<span class="greet-long">Welcome back, </span><span class="greet-short" aria-hidden="true">Hi, </span><strong>' + esc(first) + "</strong>"
+      : "Welcome back";
+    el.setAttribute("aria-label", first ? "Welcome back, " + first + ". Open my profile" : "Welcome back. Open my profile");
+    el.hidden = false;
+  }
+
   function loadFamilyDetails() {
+    return loadFamilyRows().then(paintGreeting, paintGreeting);
+  }
+
+  function loadFamilyRows() {
     familyById = Object.create(null);
     if (!signedIn() || !window.Auth.token) return Promise.resolve();
     return window.Auth.token()
