@@ -483,6 +483,18 @@
     return src;
   }
 
+  /* Visible credit for a Wikimedia Commons photo, linking to its file page
+     (which carries the author and licence). Empty for any other source,
+     so uploaded photos and Unsplash images get no caption. */
+  function commonsCredit(url) {
+    var m = /commons\.wikimedia\.org\/wiki\/Special:FilePath\/([^?#]+)/.exec(url || "");
+    if (!m) return "";
+    var page = "https://commons.wikimedia.org/wiki/File:" + m[1];
+    return '<figcaption class="photo-credit" style="margin-top:0.5rem;color:#5b6670;font-size:0.82rem">' +
+      'Photo: <a href="' + esc(page) + '" target="_blank" rel="noopener noreferrer" style="color:inherit">Wikimedia Commons</a>' +
+      "</figcaption>";
+  }
+
   function safeLink(value) {
     var href = str(value);
     return /^https?:\/\//i.test(href) ? href : "";
@@ -1035,7 +1047,7 @@
       '<p class="visibility-msg" id="visibility-msg" role="status" hidden></p>' +
       "</header>" +
       (image
-        ? '<figure class="photo"><img src="' + esc(image) + '" alt="" data-fallback="' + esc(placeholderFor(recipe)) + '"></figure>'
+        ? '<figure class="photo"><img src="' + esc(image) + '" alt="" data-fallback="' + esc(placeholderFor(recipe)) + '">' + commonsCredit(image) + '</figure>'
         : '<figure class="photo is-placeholder"><img src="' + esc(placeholderFor(recipe)) + '" alt=""></figure>') +
       '<div class="recipe-body">' +
       '<section class="ingredients-box" aria-labelledby="ing-h">' +
