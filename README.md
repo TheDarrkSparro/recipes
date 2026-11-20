@@ -222,6 +222,20 @@ How it works: `auth.js` signs people in with Supabase Auth and keeps them signed
 
 `guide/index.html` is a step-by-step page for people who add and edit recipes, at `/guide/` on the site. It's linked from the **Add a recipe** page and from the footer of every page. The screenshots are in `guide/img/`. To change the wording, edit `guide/index.html`; its styles are in `styles.css` under "Contributor guide".
 
+## Suggest an improvement (to the site)
+
+Signed-in contributors can suggest changes to the **website itself** — a new feature, something that isn't working, or any other idea. This is separate from editing a recipe: to fix a recipe, open it and use **Edit**.
+
+- **Suggest an improvement** (in the footer, members only, at `#/suggest`): pick a kind (Idea / Problem / Other), give it a short title, and add details if you like. Visitors who aren't signed in don't see it.
+- Each contributor sees **their own** suggestions and the status you've given each one, on the same page.
+- As the **site owner** you see **every** suggestion on that page, with who sent it and when. For each you can set a status — **New**, **Planned**, **Done**, or **Declined** — add a private note (only you see it), or delete it.
+
+Suggestions are kept in Supabase (`public.site_suggestions`), reachable only through the functions below, so the list can't be read from the browser directly. A contributor can file at most 10 in an hour.
+
+One-time setup: after `add-accounts.sql` and `add-recipe-hiding.sql`, open Supabase **SQL Editor**, paste `supabase/add-suggestions.sql`, and click **Run**. Until then, the page says suggestions aren't switched on yet. The files are: `suggestions.js` (the page), a footer link and `#/suggest` route in `index.html`/`app.js`, and styles in `styles.css` under "Suggest an improvement".
+
+How it works: `suggest_improvement()` files one (checking the contributor is signed in and invited), `my_suggestions()` returns the caller's own, and `owner_list_suggestions()`, `owner_set_suggestion_status()` and `owner_delete_suggestion()` are owner-only (they check `private.is_owner()` in the database, so the rule can't be got around from the browser).
+
 ## Hosting on Cloudflare
 
 The site is served by **Cloudflare Workers**: the files are served as they are, and one small Worker script handles `/api/import`. These files control it:

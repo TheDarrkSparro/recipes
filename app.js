@@ -2809,6 +2809,7 @@
       /* Keep the raw hash if it is not valid encoding. */
     }
     if (/^\/?add\/?$/.test(hash)) return { name: "add" };
+    if (/^\/?suggest\/?$/.test(hash)) return { name: "suggest" };
     if (/^\/?family\/?$/.test(hash)) return { name: "family" };
     if (/^\/?categories\/?$/.test(hash)) return { name: "categories" };
     if (/^\/?cooks\/?$/.test(hash)) return { name: "cooks" };
@@ -2849,6 +2850,10 @@
     if (window.Hydration) window.Hydration.unmount(app);
     if (current.name === "detail") renderDetail(current.id);
     else if (current.name === "add") renderAdd();
+    else if (current.name === "suggest") {
+      if (window.Suggestions) window.Suggestions.render(app);
+      else app.innerHTML = emptyBlock("Suggestions aren’t available", "The suggestions script didn’t load. Refresh the page and try again.");
+    }
     else if (current.name === "family") renderFamily();
     else if (current.name === "categories") renderCategories();
     else if (current.name === "cooks") renderCooks();
@@ -2929,7 +2934,7 @@
           renderCategories();
         } else if (current.name === "cooks") {
           renderCooks();
-        } else if (/^(cook|me|profiles|profile-edit|profile-new)$/.test(current.name)) {
+        } else if (/^(suggest|cook|me|profiles|profile-edit|profile-new)$/.test(current.name)) {
           route();
         }
       });

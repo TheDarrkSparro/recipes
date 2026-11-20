@@ -1,0 +1,51 @@
+/* Suggest an improvement (suggestions.js). Loaded after styles.css. */
+.suggest .sugg-h {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  margin: 2.25rem 0 0.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.sugg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.9rem; }
+.sugg-item {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+}
+.sugg-item-top { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.75rem; margin-bottom: 0.4rem; }
+.sugg-kind {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sugg-when, .sugg-from { font-size: 0.85rem; color: var(--muted); }
+.sugg-from { margin-left: auto; overflow-wrap: anywhere; }
+.sugg-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--slate);
+  background: var(--line-soft);
+}
+.sugg-badge.is-new { background: var(--saffron-wash); color: var(--ink); border-color: var(--saffron); }
+.sugg-badge.is-planned { background: var(--line-soft); color: var(--slate); }
+.sugg-badge.is-done { background: var(--line); color: var(--muted); }
+.sugg-badge.is-declined { background: transparent; color: var(--muted); }
+.sugg-title { margin: 0.1rem 0; font-weight: 600; font-size: 1.05rem; }
+.sugg-details, .sugg-note { margin: 0.3rem 0 0; color: var(--slate); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sugg-note { color: var(--muted); font-size: 0.95rem; }
+
+.sugg-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem 1rem; margin-top: 0.75rem; }
+.sugg-status { display: flex; flex-direction: column; gap: 0.35rem; }
+.sugg-status select { padding: 0.5rem 0.65rem; }
+.sugg-notefield { flex: 1 1 14rem; }
+.sugg-actions { display: flex; align-items: center; gap: 0.75rem 1rem; }
+.sugg-del { color: var(--danger); }
+.sugg-confirm { font-size: 0.9rem; color: var(--danger); display: inline-flex; align-items: center; gap: 0.5rem; }
+.sugg-confirm .link-btn { font-size: inherit; }
+.sugg-msg { flex-basis: 100%; }
